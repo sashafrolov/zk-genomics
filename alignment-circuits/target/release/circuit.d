@@ -1,0 +1,1 @@
+/Users/sasha/Documents/zk-genomics/alignment-circuits/target/release/circuit: /Users/sasha/Documents/zk-genomics/alignment-circuits/src/bin/circuit.rs /Users/sasha/Documents/zk-genomics/alignment-circuits/src/lib.rs

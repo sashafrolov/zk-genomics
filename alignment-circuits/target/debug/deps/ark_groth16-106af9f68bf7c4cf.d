@@ -1,0 +1,10 @@
+/Users/sasha/Documents/zk-genomics/alignment-circuits/target/debug/deps/ark_groth16-106af9f68bf7c4cf.d: /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/lib.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/r1cs_to_qap.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/data_structures.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/generator.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/prover.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/verifier.rs
+
+/Users/sasha/Documents/zk-genomics/alignment-circuits/target/debug/deps/libark_groth16-106af9f68bf7c4cf.rmeta: /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/lib.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/r1cs_to_qap.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/data_structures.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/generator.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/prover.rs /Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/verifier.rs
+
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/lib.rs:
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/r1cs_to_qap.rs:
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/data_structures.rs:
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/generator.rs:
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/prover.rs:
+/Users/sasha/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.4.0/src/verifier.rs:

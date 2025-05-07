@@ -198,10 +198,10 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
             let bases_match = target_sequence_read_val.is_eq(&reference_sequence_read_val).unwrap();
             is_match.not().or(&bases_match).unwrap().enforce_equal(&Boolean::<F>::TRUE).unwrap();
 
-            target_string_memcheck_prod_2 *= &challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1];
-            reference_string_memcheck_prod_2 *= &challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1];
+            target_string_memcheck_prod_2 *= (&is_match.or(&is_insertion).unwrap()).select(&(&challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
+            reference_string_memcheck_prod_2 *= (&is_match.or(&is_deletion).unwrap()).select(&(&challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
 
-            target_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0];
+            target_index_var += (&is_match.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0]);
             reference_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_deletion.to_constraint_field().unwrap()[0];
             match self.cigar_string_bases[i] {
                 0 => {target_index+=1; reference_index +=1},
@@ -226,7 +226,17 @@ fn generate_random_sequence(bases: usize) -> (Vec<Fr>, Vec<usize>) {
     let random_bools = (0..bases).map(|_| vec![rng.gen_bool(0.5), rng.gen_bool(0.5)]).collect::<Vec<_>>();
     let random_bases = random_bools.clone().into_iter().map(|x| (x[1] as usize) * 2 + (x[0] as usize)).collect::<Vec<_>>();
 
-    let random_felts = random_bools.clone().into_iter().flatten().collect::<Vec<_>>().chunks(BASES_PER_BLOCK * 2).map(|x| Fr::from_bigint(BigInt::from_bits_le(x)).unwrap()).collect();
+    let random_felts = 
+            random_bools.clone()
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .chunks(BASES_PER_BLOCK * 2)
+                .map(|x| {
+                    let mut x_vec = vec![false; 5]; // need to pad x with 0's so this behaves as expected.
+                    x_vec.extend_from_slice(x);
+                    Fr::from_bigint(BigInt::from_bits_le(&x_vec)).unwrap()})
+                .collect();
     (random_felts, random_bases)
 }
 
@@ -245,17 +255,19 @@ fn main() {
     // let sponge_params = poseidon_parameters_for_test();
 
 
-    // let (reference_sequence_felts, reference_sequence_bases) = generate_random_sequence(SEQUENCE_BASE_PAIRS);
-    // let (target_sequence_felts, target_sequence_bases) = (reference_sequence_felts.clone(), reference_sequence_bases.clone());
-    let reference_sequence_felts = (0..SEQUENCE_BLOCK_LENGTH).map(|_| Fr::zero()).collect::<Vec<_>>();
-    let reference_sequence_bases = (0..SEQUENCE_BASE_PAIRS).map(|_| 0usize).collect::<Vec<_>>();
-    let target_sequence_felts = reference_sequence_felts.clone();
-    let target_sequence_bases = reference_sequence_bases.clone();
+    let (reference_sequence_felts, reference_sequence_bases) = generate_random_sequence(SEQUENCE_BASE_PAIRS);
+    let (target_sequence_felts, target_sequence_bases) = (reference_sequence_felts.clone(), reference_sequence_bases.clone());
+    // let reference_sequence_felts = (0..SEQUENCE_BLOCK_LENGTH).map(|_| Fr::zero()).collect::<Vec<_>>();
+    // let reference_sequence_bases = (0..SEQUENCE_BASE_PAIRS).map(|_| 0usize).collect::<Vec<_>>();
+    // let target_sequence_felts = reference_sequence_felts.clone();
+    // let target_sequence_bases = reference_sequence_bases.clone();
     let cigar_string_felts: Vec<_> = (0..CIGAR_STRING_LENGTH_BLOCKS).map(|_| Fr::zero()).collect();
     let cigar_string_letters = (0..CIGAR_STRING_LENGTH).map(|_| 0).collect::<Vec<_>>();
     let alignment_score = 0;
 
-    // println!("Example generated sequence: {:?}", generate_random_sequence(125).0[0].0.to_bits_be());
+    let random_felt = generate_random_sequence(375).0[2];
+    println!("Example generated sequence: {:?}", random_felt.0);
+    println!("Example generated sequence: {:?}", random_felt.into_bigint().to_bits_le());
 
     let c = AlignmentCircuit::<Fr>::new(reference_sequence_felts.clone(), reference_sequence_bases.clone(), target_sequence_felts.clone(), target_sequence_bases.clone(), cigar_string_felts.clone(), cigar_string_letters.clone(), alignment_score);
     {

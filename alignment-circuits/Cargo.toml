@@ -21,6 +21,16 @@ rand = { version = "0.8", features = ["std"]}
 tracing-subscriber = "0.2.25"
 tracing = "0.1.41"
 
+itertools = "0.13"
+p3-baby-bear = "0.2.0"
+p3-commit = "0.2.0"
+p3-field = "0.2.0"
+p3-matrix = "0.2.0"
+p3-poseidon2 = "0.2.0"
+p3-symmetric = "0.2.0"
+p3-merkle-tree = "0.2.0"
+rand_chacha = "0.3.1"
+
 [features]
 default = ["std"]
 std = ["ark-ff/std", "ark-ec/std", "ark-poly/std", "ark-relations/std", "ark-std/std", "ark-serialize/std", "ark-bls12-381/std", "ark-crypto-primitives/sponge", "ark-crypto-primitives/r1cs"  ]

@@ -257,10 +257,7 @@ fn main() {
     // zk proofs are a uniform model of computation so data used is not overly important.
     let (reference_sequence_felts, reference_sequence_bases) = generate_random_sequence(SEQUENCE_BASE_PAIRS);
     let (target_sequence_felts, target_sequence_bases) = (reference_sequence_felts.clone(), reference_sequence_bases.clone());
-    // let reference_sequence_felts = (0..SEQUENCE_BLOCK_LENGTH).map(|_| Fr::zero()).collect::<Vec<_>>();
-    // let reference_sequence_bases = (0..SEQUENCE_BASE_PAIRS).map(|_| 0usize).collect::<Vec<_>>();
-    // let target_sequence_felts = reference_sequence_felts.clone();
-    // let target_sequence_bases = reference_sequence_bases.clone();
+
     let cigar_string_felts: Vec<_> = (0..CIGAR_STRING_LENGTH_BLOCKS).map(|_| Fr::zero()).collect();
     let cigar_string_letters = (0..CIGAR_STRING_LENGTH).map(|_| 0).collect::<Vec<_>>();
     let alignment_score = 0;

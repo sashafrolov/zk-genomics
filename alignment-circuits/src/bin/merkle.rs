@@ -45,7 +45,7 @@ fn main() {
 
     // Large enough to fit human genome in the blocks.
     static NUM_BLOCKS: usize = 200_000_000usize.next_power_of_two();
-    static LEAF_SIZE: usize = 1 << 7; // log log n is a bit less than 5
+    static LEAF_SIZE: usize = 1 << 7; // log log n is a bit less than 5, vary this parameter for benchmarks.
     static NUM_LEAVES: usize = NUM_BLOCKS / LEAF_SIZE;
     static INDEX_FOR_MEMBERSHIP_PROOF: usize = 1;
 

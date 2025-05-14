@@ -31,7 +31,7 @@ use ark_relations::r1cs::{ConstraintLayer, TracingMode};
 use tracing_subscriber::layer::SubscriberExt;
 
 const BASES_PER_BLOCK: usize = 125;
-const SEQUENCE_BLOCK_LENGTH: usize = 1 << 4;
+const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
 const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
@@ -124,12 +124,12 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
         let two = FpVar::new_constant(cs.clone(), F::one() + F::one()).unwrap();
         for block in reference_sequence_vars {
             let block_bits = &block.to_bits_le().unwrap();
-            let mut chunks = block_bits[5..].chunks_exact(2);
+            let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
                 let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 reference_bases.push(new_bp);
             }
-            for bit in &block_bits[0..5] {
+            for bit in &block_bits[250..] {
                 bit.enforce_equal(&Boolean::<F>::FALSE).unwrap();
             }
         }
@@ -137,12 +137,12 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
         let mut target_bases = Vec::new();
         for block in target_sequence_vars {
             let block_bits = &block.to_bits_le().unwrap();
-            let mut chunks = block_bits[5..].chunks_exact(2);
+            let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
                 let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 target_bases.push(new_bp);
             }
-            for bit in &block_bits[0..5] {
+            for bit in &block_bits[250..] {
                 bit.enforce_equal(&Boolean::<F>::FALSE).unwrap();
             }
         }
@@ -150,12 +150,12 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
         let mut cigar_chars = Vec::new();
         for block in cigar_string_vars {
             let block_bits = &block.to_bits_le().unwrap();
-            let mut chunks = block_bits[5..].chunks_exact(2);
+            let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
                 let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 cigar_chars.push(new_bp);
             }
-            for bit in &block_bits[0..5] {
+            for bit in &block_bits[250..] {
                 bit.enforce_equal(&Boolean::<F>::FALSE).unwrap();
             }
         }
@@ -233,8 +233,10 @@ fn generate_random_sequence(bases: usize) -> (Vec<Fr>, Vec<usize>) {
                 .collect::<Vec<_>>()
                 .chunks(BASES_PER_BLOCK * 2)
                 .map(|x| {
-                    let mut x_vec = vec![false; 5]; // need to pad x with 0's so this behaves as expected.
+                    let mut x_vec = vec![];
+                    let five_false =  vec![false; 5]; // need to pad x with 0's so this behaves as expected.
                     x_vec.extend_from_slice(x);
+                    x_vec.extend_from_slice(&five_false);
                     Fr::from_bigint(BigInt::from_bits_le(&x_vec)).unwrap()})
                 .collect();
     (random_felts, random_bases)
@@ -246,15 +248,13 @@ fn usize_to_felt<F: PrimeField>(base: usize) -> F {
         1 => F::one(),
         2 => F::one() + F::one(),
         3 => F::one() + F::one() + F::one(),
-        _ => panic!("BLYAAAAAA"),
+        _ => panic!("bad base number provided"),
     }
 }
 
 fn main() {
-    let rng = &mut ark_std::test_rng();
-    // let sponge_params = poseidon_parameters_for_test();
-
-
+    // For benchmarking, just verify the alignment of 2 identical sequences, I did correctness testing separately.
+    // zk proofs are a uniform model of computation so data used is not overly important.
     let (reference_sequence_felts, reference_sequence_bases) = generate_random_sequence(SEQUENCE_BASE_PAIRS);
     let (target_sequence_felts, target_sequence_bases) = (reference_sequence_felts.clone(), reference_sequence_bases.clone());
     // let reference_sequence_felts = (0..SEQUENCE_BLOCK_LENGTH).map(|_| Fr::zero()).collect::<Vec<_>>();
@@ -265,9 +265,7 @@ fn main() {
     let cigar_string_letters = (0..CIGAR_STRING_LENGTH).map(|_| 0).collect::<Vec<_>>();
     let alignment_score = 0;
 
-    let random_felt = generate_random_sequence(375).0[2];
-    println!("Example generated sequence: {:?}", random_felt.0);
-    println!("Example generated sequence: {:?}", random_felt.into_bigint().to_bits_le());
+    println!("Sequence length is: {}", SEQUENCE_BASE_PAIRS);
 
     let c = AlignmentCircuit::<Fr>::new(reference_sequence_felts.clone(), reference_sequence_bases.clone(), target_sequence_felts.clone(), target_sequence_bases.clone(), cigar_string_felts.clone(), cigar_string_letters.clone(), alignment_score);
     {

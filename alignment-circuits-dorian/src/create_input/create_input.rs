@@ -120,6 +120,9 @@ pub enum ComputeType {
     #[cfg(feature = "spartan")]
     /// ECDSA in right-field approach
     VerifyEcdsaRightWhole,
+    #[cfg(feature = "spartan")]
+    /// Basic sequence alignment circuit
+    BasicAlignment,
 }
 
 /// Prover/Verifier

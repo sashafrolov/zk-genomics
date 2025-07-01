@@ -14,6 +14,7 @@ use crate::hash::hash::DigestAlgorithm;
 use crate::hash::sha256::{prover_input_for_sha256_ori, prover_input_for_sha256_adv};
 use crate::conditional_print;
 use crate::eddsa::sigma::prover_input_for_verifyeddsa_sigma;
+use crate::alignment::prover_input_for_basicalignment;
 
 #[cfg(feature = "spartan")]
 use crate::right_field_arithmetic::field::{ARC_MOD_T256, ARC_MOD_CURVE25519, ARC_MOD_T25519};
@@ -148,38 +149,45 @@ pub fn create_prover_input(compute: ComputeType, aux_input: String, pfcurve: &Pf
 
     let result = match compute {
         ComputeType::EddsaSigma => {
-            let mut message = Vec::new();
-            let mlen: usize = 64 * aux_input.parse::<usize>().expect("failed to parse message len");
-            // println!("{}", mlen);
-            for i in 0..mlen {
-                message.push((i % 256) as u8);
+                        let mut message = Vec::new();
+                        let mlen: usize = 64 * aux_input.parse::<usize>().expect("failed to parse message len");
+                        // println!("{}", mlen);
+                        for i in 0..mlen {
+                            message.push((i % 256) as u8);
+                        }
+                        prover_input_for_verifyeddsa_sigma(message, 5, 55, true)
             }
-            prover_input_for_verifyeddsa_sigma(message, 5, 55, true)
-        }
         ComputeType::VerifyRsaAdvComplete => prover_input_for_verifyrsa_adv(true, false, true, 2048),
         ComputeType::VerifyRsaAdvWhole => prover_input_for_verifyrsa_adv_whole(2048, "", aux_input),
-        ComputeType::VerifyEcdsaAdvIncompl => prover_input_for_verifyecdsa(true, true, true, true), // advanced = true; incomplete = true
-        ComputeType::VerifyEcdsaAdvIncomplWhole => prover_input_for_verifyecdsa_whole(aux_input), // same as before but include hashing
+        ComputeType::VerifyEcdsaAdvIncompl => prover_input_for_verifyecdsa(true, true, true, true),
+        ComputeType::VerifyEcdsaAdvIncomplWhole => prover_input_for_verifyecdsa_whole(aux_input),
         ComputeType::VerifyEcdsaSigma => prover_input_for_verifyecdsa_sigma(),
-        ComputeType::VerifyEcdsaSigmaWhole => prover_input_for_verifyecdsa_sigma_whole(aux_input), 
+        ComputeType::VerifyEcdsaSigmaWhole => prover_input_for_verifyecdsa_sigma_whole(aux_input),
         #[cfg(feature = "spartan")]
-        ComputeType::VerifyEcdsaRight => prover_input_for_verifyecdsa_rightfield(),// prover_input_for_verifyecdsa_right(),
+            ComputeType::VerifyEcdsaRight => prover_input_for_verifyecdsa_rightfield(),
         #[cfg(feature = "spartan")]
-        ComputeType::SpartanTest => prover_input_for_spartantest(&ARC_MOD_CURVE25519),
+            ComputeType::SpartanTest => prover_input_for_spartantest(&ARC_MOD_CURVE25519),
         #[cfg(feature = "spartan")]
-        ComputeType::SpartanTestT256 => prover_input_for_spartantest(&ARC_MOD_T256),
+            ComputeType::SpartanTestT256 => prover_input_for_spartantest(&ARC_MOD_T256),
         ComputeType::Sha256Ori => prover_input_for_sha256_ori(aux_input),
         ComputeType::Sha256Adv => prover_input_for_sha256_adv(aux_input, None),
         #[cfg(feature = "spartan")]
-        ComputeType::Sha256AdvSpartan => {
+            ComputeType::Sha256AdvSpartan => {
+                match pfcurve {
+                    PfCurve::Curve25519 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_CURVE25519)),
+                    PfCurve::T256 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_T256)),
+                    PfCurve::T25519 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_T25519)),
+                }
+            },
+        #[cfg(feature = "spartan")]
+            ComputeType::VerifyEcdsaRightWhole => prover_input_for_verifyecdsa_rightfield_whole(aux_input),
+        ComputeType::BasicAlignment => {
             match pfcurve {
-                PfCurve::Curve25519 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_CURVE25519)),
-                PfCurve::T256 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_T256)),
-                PfCurve::T25519 => prover_input_for_sha256_adv(aux_input, Some(&ARC_MOD_T25519)),
+                PfCurve::Curve25519 => prover_input_for_basicalignment(&ARC_MOD_CURVE25519),
+                PfCurve::T256 => prover_input_for_basicalignment(&ARC_MOD_T256),
+                PfCurve::T25519 => prover_input_for_basicalignment(&ARC_MOD_T25519),
             }
         },
-        #[cfg(feature = "spartan")]
-        ComputeType::VerifyEcdsaRightWhole => prover_input_for_verifyecdsa_rightfield_whole(aux_input), // to do
     };
     result
 }

@@ -33,3 +33,4 @@ pub mod zkconst;
 #[cfg(feature = "spartan")]
 pub mod right_field_arithmetic;
 pub mod eddsa;
+pub mod alignment;

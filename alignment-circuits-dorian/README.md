@@ -1,3 +1,19 @@
+# Examples for CirC based alignment circuits:
+
+## Examples
+
+### Basic alignment:
+
+Build:
+    cargo run --release --example circ -- zok_src/alignment/alignment.zok r1cs --action setup --proof-impl dorian --pfcurve curve25519
+Prove:
+    cargo run --release --example run_zk -- --compute basic-alignment --proof-impl dorian --pfcurve curve25519 --action prove
+
+
+
+
+# Old Readme
+
 # Sig-PoP
 This repository contains implementations of proofs of posession for ECDSA, Ed25519, RSA, as well as standalone implementations of SHA512 and SHA256.
 

@@ -1,0 +1,2 @@
+alignment-circuits-arkworks contains some code based on the VeriTAS paper and the zk-Cinema paper (just stuff I copy pasted out of there).
+alignment-circuits-dorian is a forked version of the code for the Dorian/Sigpop paper.

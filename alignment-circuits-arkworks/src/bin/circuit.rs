@@ -5,33 +5,33 @@ use ark_bls12_381::{Bls12_381, Fr};
 use ark_crypto_primitives::snark::{CircuitSpecificSetupSNARK, SNARK};
 use ark_crypto_primitives::sponge::constraints::CryptographicSpongeVar;
 use ark_crypto_primitives::sponge::poseidon::constraints::PoseidonSpongeVar;
-use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
-use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
+// use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
+// use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
 
-use ark_crypto_primitives::sponge::{CryptographicSponge, FieldBasedCryptographicSponge};
+// use ark_crypto_primitives::sponge::{CryptographicSponge, FieldBasedCryptographicSponge};
 use ark_ff::vec::Vec;
 use ark_ff::PrimeField;
-use ark_ff::UniformRand;
+// use ark_ff::UniformRand;
 use ark_ff::{BigInt, BigInteger};
 use ark_groth16::Groth16;
 use ark_r1cs_std::fields::fp::FpVar;
-use ark_r1cs_std::bits::ToBitsGadget;
-use ark_r1cs_std::ToConstraintFieldGadget;
-use ark_r1cs_std::{prelude::*, uint128::UInt128};
+use ark_r1cs_std::convert::ToBitsGadget;
+use ark_r1cs_std::convert::ToConstraintFieldGadget;
+use ark_r1cs_std::{prelude::*};
 use ark_relations::r1cs::ConstraintSystem;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
-use ark_relations::*;
+// use ark_relations::*;
 use ark_std::rand::{RngCore, SeedableRng};
 use ark_std::test_rng;
 use ark_std::Zero;
-use ark_std::time::{SystemTime, UNIX_EPOCH};
+// use ark_std::time::{SystemTime, UNIX_EPOCH};
 use rand::Rng;
 use alignment_circuits::poseidon_parameters_for_test;
 use ark_relations::r1cs::{ConstraintLayer, TracingMode};
 use tracing_subscriber::layer::SubscriberExt;
 
 const BASES_PER_BLOCK: usize = 125;
-const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
+const SEQUENCE_BLOCK_LENGTH: usize = 1 << 4;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
 const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
@@ -196,12 +196,12 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
 
             // if is_match, bases_match must be true. if not is match either is fine.
             let bases_match = target_sequence_read_val.is_eq(&reference_sequence_read_val).unwrap();
-            is_match.not().or(&bases_match).unwrap().enforce_equal(&Boolean::<F>::TRUE).unwrap();
+            ((!&is_match) | (&bases_match)).enforce_equal(&Boolean::<F>::TRUE).unwrap();
 
-            target_string_memcheck_prod_2 *= (&is_match.or(&is_insertion).unwrap()).select(&(&challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
-            reference_string_memcheck_prod_2 *= (&is_match.or(&is_deletion).unwrap()).select(&(&challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
+            target_string_memcheck_prod_2 *= (&is_match | &is_insertion).select(&(&challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
+            reference_string_memcheck_prod_2 *= (&is_match | &is_deletion).select(&(&challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
 
-            target_index_var += (&is_match.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0]);
+            target_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0];
             reference_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_deletion.to_constraint_field().unwrap()[0];
             match self.cigar_string_bases[i] {
                 0 => {target_index+=1; reference_index +=1},
@@ -271,8 +271,8 @@ fn main() {
         let subscriber = tracing_subscriber::Registry::default().with(layer);
         let _guard = tracing::subscriber::set_default(subscriber);
 
-        let mut circuit = c.clone();
-        let mut cs = ConstraintSystem::new_ref();
+        let circuit = c.clone();
+        let cs = ConstraintSystem::new_ref();
         circuit.generate_constraints(cs.clone()).unwrap();
         println!("Num constraints: {:?}", cs.num_constraints());
         // Let's check whether the constraint system is satisfied

@@ -1,3 +1,0 @@
-def main(private field x, private field y) -> field:
-    return if x > y then x  else y fi
-

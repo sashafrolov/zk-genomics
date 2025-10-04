@@ -1,2 +1,0 @@
-def main(private u32 x) -> u32:
-    return 0x00000002 * x

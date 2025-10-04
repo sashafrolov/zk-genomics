@@ -1,6 +1,3 @@
-// This file is largely adopted from the VeriTAS paper (thank you Trisha) because it was already doing
-// basically what I needed.
-
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_crypto_primitives::snark::{CircuitSpecificSetupSNARK, SNARK};
 use ark_crypto_primitives::sponge::constraints::CryptographicSpongeVar;
@@ -188,9 +185,6 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
             let is_deletion = cigar_chars[i].is_eq(&deletion).unwrap();
             alignment_score += &is_deletion.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0];
 
-            // TODO: convert the strings of felts into strings of base pairs
-            // as part of the struct (or this function). For now don't compute an alignment and just assume it's 
-            // 100% match.
             let target_sequence_read_val = FpVar::new_witness(cs.clone(), || Ok(usize_to_felt::<F>(self.target_sequence_bases[i]))).unwrap();
             let reference_sequence_read_val = FpVar::new_witness(cs.clone(), || Ok(usize_to_felt::<F>(self.reference_sequence_bases[i]))).unwrap();
 

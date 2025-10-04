@@ -1,5 +1,85 @@
-use ark_ff::PrimeField;
+mod alignment_plain_computation;
+
+use ark_ff::{BigInteger, PrimeField};
 use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
+use rand::RngCore;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Base {
+    A,
+    C,
+    G,
+    T,
+}
+
+impl Base {
+    pub fn to_field<F: PrimeField>(&self) -> F {
+        match self {
+            Base::A => F::from(0u64),
+            Base::C => F::from(1u64),
+            Base::G => F::from(2u64),
+            Base::T => F::from(3u64),
+        }
+    }
+
+    pub fn from_field<F: PrimeField>(x: F) -> Option<Self> {
+        // Convert to a u64, assuming the value fits in 0..3
+        let n = x.into_bigint().to_bytes_le()[0];
+        match n {
+            0 => Some(Base::A),
+            1 => Some(Base::C),
+            2 => Some(Base::G),
+            3 => Some(Base::T),
+            _ => None,
+        }
+    }
+
+    pub fn random_sequence(n: usize) -> Vec<Base> {
+        let mut rng = rand::thread_rng();
+        (0..n)
+            .map(|_| match rng.next_u32() % 4{
+                0 => Base::A,
+                1 => Base::C,
+                2 => Base::G,
+                3 => Base::T,
+                _ => panic!("What the heck?"),
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CigarChar {
+    Match,
+    Insert,
+    Delete,
+    Clip, // Especially the Clip character is based on a very loose interpretation of the CIGAR standard.
+}
+
+impl CigarChar {
+    pub fn to_field<F: PrimeField>(&self) -> F {
+        match self {
+            CigarChar::Match => F::from(0u64),
+            CigarChar::Insert => F::from(1u64),
+            CigarChar::Delete => F::from(2u64),
+            CigarChar::Clip => F::from(3u64),
+        }
+    }
+
+    pub fn from_field<F: PrimeField>(x: F) -> Option<Self> {
+        // Convert to a u64, assuming the value fits in 0..3
+        let n = x.into_bigint().to_bytes_le()[0];
+        match n {
+            0 => Some(CigarChar::Match),
+            1 => Some(CigarChar::Insert),
+            2 => Some(CigarChar::Delete),
+            3 => Some(CigarChar::Clip),
+            _ => None,
+        }
+    }
+}
+
 
 /// Generate default parameters (bls381-fr-only) for alpha = 17, state-size = 8
 pub fn poseidon_parameters_for_test<F: PrimeField>() -> PoseidonConfig<F> {

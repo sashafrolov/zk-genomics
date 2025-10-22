@@ -19,7 +19,7 @@ pub fn basic_alignment(
     match_score: f64,
     mismatch_score: f64,
     gap_score: f64,
-) -> (Vec<CigarChar>, u32) {
+) -> (Vec<CigarChar>, usize) {
     let ref_len = reference_sequence.len();
     let target_len = target_sequence.len();
 
@@ -146,9 +146,9 @@ pub fn basic_alignment(
 
     // Get final alignment score
     let final_score = scores[(num_rows * num_cols) - 1];
-    let final_score_u32 = final_score.round() as u32;
+    let final_score_usize = final_score.round() as usize;
 
-    (cigar, final_score_u32)
+    (cigar, final_score_usize)
 }
 
 pub fn affine_gap_alignment(
@@ -217,6 +217,28 @@ mod tests {
         assert_eq!(cigar[2], CigarChar::Match);
         assert_eq!(cigar[3], CigarChar::Match);
     }
+
+    // fn test_basic_alignment_with_gap() {
+    //     let reference = vec![Base::T, Base::C, Base::G, Base::T];
+    //     let target = vec![Base::A, Base::C, Base::G, Base::T];
+        
+    //     let (cigar, score) = basic_alignment(
+    //         reference,
+    //         target,
+    //         1.0,
+    //         -1.0,
+    //         -1.0,
+    //     );
+        
+    //     println!("CIGAR: {:?}", cigar);
+    //     println!("Score: {}", score);
+        
+    //     assert_eq!(cigar.len(), 4);
+    //     assert_eq!(cigar[0], CigarChar::Match); 
+    //     assert_eq!(cigar[1], CigarChar::Insert);
+    //     assert_eq!(cigar[2], CigarChar::Match);
+    //     assert_eq!(cigar[3], CigarChar::Match);
+    // }
 
     #[test]
     fn test_basic_alignment_perfect_match() {

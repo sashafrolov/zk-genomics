@@ -25,7 +25,7 @@ use ark_std::Zero;
 use rand::Rng;
 use alignment_circuits::poseidon_parameters_for_test;
 use ark_relations::r1cs::{ConstraintLayer, TracingMode};
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const BASES_PER_BLOCK: usize = 125;
 const SEQUENCE_BLOCK_LENGTH: usize = 1 << 4;
@@ -260,10 +260,11 @@ fn main() {
 
     let c = AlignmentCircuit::<Fr>::new(reference_sequence_felts.clone(), reference_sequence_bases.clone(), target_sequence_felts.clone(), target_sequence_bases.clone(), cigar_string_felts.clone(), cigar_string_letters.clone(), alignment_score);
     {
-        let mut layer = ConstraintLayer::default();
-        layer.mode = TracingMode::OnlyConstraints;
-        let subscriber = tracing_subscriber::Registry::default().with(layer);
-        let _guard = tracing::subscriber::set_default(subscriber);
+        // let mut layer = ConstraintLayer::default();
+        // layer.mode = TracingMode::OnlyConstraints;
+        // Some small issue with tracing subscriber i haven't been able to figure out because Spartan's and arkworks' aren't compatible.
+        // let subscriber = tracing_subscriber::registry().with(layer);
+        // let _guard = tracing::subscriber::set_default(subscriber);
 
         let circuit = c.clone();
         let cs = ConstraintSystem::new_ref();

@@ -18,7 +18,8 @@ ark-std = { version = "0.5.0", default-features = false }
 rayon = { version = "1.5.1", default-features = false, optional = true }
 sha2 = "0.10.8"
 rand = { version = "0.8", features = ["std"]}
-tracing-subscriber = "0.2.25"
+# tracing-subscriber = {version = "0.2.25", features = ["env-filter"]}
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "time"] }
 tracing = "0.1.41"
 
 itertools = "0.13"
@@ -30,6 +31,14 @@ p3-poseidon2 = "0.2.0"
 p3-symmetric = "0.2.0"
 p3-merkle-tree = "0.2.0"
 rand_chacha = "0.3.1"
+
+neptune = "13.0.0"
+generic-array = "0.14"
+bellpepper-core = "0.4.0"
+bellpepper = "0.4.0"
+ff = { version = "0.13.0", features = ["derive"] }
+spartan2 = { path = "../Spartan2" }
+
 
 [features]
 default = ["std"]

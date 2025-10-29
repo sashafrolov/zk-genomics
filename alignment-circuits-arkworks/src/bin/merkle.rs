@@ -1,20 +1,17 @@
 // Gives a performance example for Merkle Tree-based succincct data structure with big leaves (section 4.2 in the report).
 
-use itertools::Itertools;
 use p3_baby_bear::{BabyBear, DiffusionMatrixBabyBear};
 use p3_commit::Mmcs;
-use p3_field::{AbstractField, Field};
+use p3_field::Field;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_matrix::{Dimensions, Matrix};
+use p3_matrix::Dimensions;
 use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{
-    CryptographicHasher, PaddingFreeSponge, PseudoCompressionFunction, TruncatedPermutation,
+    PaddingFreeSponge, TruncatedPermutation,
 };
-use rand::thread_rng;
 
 use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use std::time::Duration;
 use std::time::Instant;
 
 use p3_merkle_tree::FieldMerkleTreeMmcs;
@@ -51,9 +48,9 @@ fn main() {
 
     let data: Vec<u8> = (0..NUM_BLOCKS).map(|_| rng.next_u32() as u8).collect();
     // let image_copy = image.clone();
-    let mut data_as_felts: Vec<BabyBear> = data
+    let data_as_felts: Vec<BabyBear> = data
         .into_iter()
-        .map(|chunk| BabyBear::new((chunk as u32)))
+        .map(|chunk| BabyBear::new(chunk as u32))
         .collect();
 
     let data_matrix = RowMajorMatrix::new(data_as_felts, LEAF_SIZE);

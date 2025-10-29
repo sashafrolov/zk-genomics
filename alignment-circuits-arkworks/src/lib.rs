@@ -1,7 +1,7 @@
 pub mod alignment_plain_computation;
 
-use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
-use ff::{FromUniformBytes, PrimeField, PrimeFieldBits};
+// use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
+use ff::{PrimeField, PrimeFieldBits};
 use rand::RngCore;
 
 use bellpepper::gadgets::multipack::compute_multipacking;

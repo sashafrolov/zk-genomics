@@ -151,11 +151,11 @@ pub fn basic_alignment(
 }
 
 pub fn affine_gap_alignment(
-    reference_sequence: Vec<Base>,
-    target_sequence: Vec<Base>,
-    gap_start_score: f64,
-    match_score: f64,
-    mismatch_score: f64,
+    _reference_sequence: Vec<Base>,
+    _target_sequence: Vec<Base>,
+    _gap_start_score: f64,
+    _match_score: f64,
+    _mismatch_score: f64,
 ) -> (Vec<CigarChar>, u32) {
     todo!("Not yet implemented");
 }
@@ -252,7 +252,7 @@ mod tests {
     fn test_basic_alignment_one_empty() {
         let reference = vec![Base::A, Base::C, Base::G];
 
-        let (cigar, score) = basic_alignment(reference.clone(), vec![], 1.0, -1.0, -1.0);
+        let (cigar, _score) = basic_alignment(reference.clone(), vec![], 1.0, -1.0, -1.0);
 
         // All deletes
         assert_eq!(cigar.len(), 3);

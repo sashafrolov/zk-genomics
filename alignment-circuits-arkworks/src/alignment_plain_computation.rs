@@ -18,19 +18,19 @@ pub fn basic_alignment(
     match_score: f64,
     mismatch_score: f64,
     gap_score: f64,
-) -> (Vec<CigarChar>, usize) {
+) -> (Vec<CigarChar>, f64) {
     let ref_len = reference_sequence.len();
     let target_len = target_sequence.len();
 
     // Handle empty sequences
     if ref_len == 0 && target_len == 0 {
-        return (Vec::new(), 0);
+        return (Vec::new(), 0.0);
     }
     if ref_len == 0 {
-        return (vec![CigarChar::Insert; target_len], 0);
+        return (vec![CigarChar::Insert; target_len], 0.0);
     }
     if target_len == 0 {
-        return (vec![CigarChar::Delete; ref_len], 0);
+        return (vec![CigarChar::Delete; ref_len], 0.0);
     }
 
     let num_rows = ref_len + 1;
@@ -145,7 +145,7 @@ pub fn basic_alignment(
 
     // Get final alignment score
     let final_score = scores[(num_rows * num_cols) - 1];
-    let final_score_usize = final_score.round() as usize;
+    let final_score_usize = final_score.round();
 
     (cigar, final_score_usize)
 }
@@ -237,7 +237,7 @@ mod tests {
 
         assert_eq!(cigar.len(), 4);
         assert!(cigar.iter().all(|&c| c == CigarChar::Match));
-        assert_eq!(score, 4);
+        assert_eq!(score, 4.0);
     }
 
     #[test]
@@ -245,7 +245,7 @@ mod tests {
         let (cigar, score) = basic_alignment(vec![], vec![], 1.0, -1.0, -1.0);
 
         assert_eq!(cigar.len(), 0);
-        assert_eq!(score, 0);
+        assert_eq!(score, 0.0);
     }
 
     #[test]

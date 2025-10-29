@@ -1,24 +1,24 @@
 //! examples/basic_alignment.rs
 //! Spartan version of the alignment circuit previously written
-//! in Arkworks. Similar, just hopefully a lot faster.
+//! in Arkworks. Similar, just a lot faster.
 //!
+#![allow(non_snake_case)]
 #[cfg(feature = "jem")]
 #[global_allocator]
 static GLOBAL: Jemalloc = tikv_jemallocator::Jemalloc;
 use bellpepper::gadgets::boolean::field_into_allocated_bits_le;
 use bellpepper_core::{
     ConstraintSystem, LinearCombination, SynthesisError,
-    boolean::{AllocatedBit, Boolean},
     num::AllocatedNum,
 };
-use ff::{Field, FromUniformBytes, PrimeField, PrimeFieldBits};
-use generic_array::typenum::{U2, U3};
+use ff::{Field, PrimeField, PrimeFieldBits};
+use generic_array::typenum::U2;
 use neptune::sponge::{
     api::{IOPattern, SpongeAPI, SpongeOp},
     circuit::SpongeCircuit,
     vanilla::{Mode, Sponge, SpongeTrait},
 };
-use neptune::{Arity, Strength, circuit2::Elt, poseidon::PoseidonConstants};
+use neptune::{Strength, circuit2::Elt};
 use spartan2::{
     provider::T256HyraxEngine,
     spartan::SpartanSNARK,
@@ -36,14 +36,14 @@ type E = T256HyraxEngine;
 const BASES_PER_BLOCK: usize = 125;
 const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
-const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
-const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
+// const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
+// const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
 
 #[derive(Clone, Debug)]
 struct BasicAlignmentCircuit<Scalar: PrimeField> {
     pub reference_sequence_felts: Vec<Scalar>, // The reference for a certain gene, encoded as field elements, where BASES_PER_BLOCK bases are packed per field element
     pub reference_sequence_bases: Vec<Base>,   // Reference sequence
-    pub target_sequence_felts: Vec<Scalar>,    // The value being aligned against the target
+    pub target_sequence_felts: Vec<Scalar>,    // The sequence being aligned against the reference
     pub target_sequence_bases: Vec<Base>,
     pub cigar_string_felts: Vec<Scalar>,
     pub cigar_string_chars: Vec<CigarChar>,
@@ -58,6 +58,7 @@ impl<Scalar: PrimeField + PrimeFieldBits> BasicAlignmentCircuit<Scalar> {
             reference_sequence_bases.to_felt_blocks::<Scalar>(BASES_PER_BLOCK);
         let target_sequence_felts = target_sequence_bases.to_felt_blocks::<Scalar>(BASES_PER_BLOCK);
 
+        // We will be inverting the alignment score for public output, since Spartan likes short bitlengths.
         let (cigar_string_chars, alignment_score) = basic_alignment(
             reference_sequence_bases.clone(),
             target_sequence_bases.clone(),
@@ -66,7 +67,8 @@ impl<Scalar: PrimeField + PrimeFieldBits> BasicAlignmentCircuit<Scalar> {
             -1.0,
         );
         let cigar_string_felts = cigar_string_chars.to_felt_blocks(BASES_PER_BLOCK);
-
+        let positive_alignment_score = (- alignment_score) as usize;
+        
         Self {
             reference_sequence_felts,
             reference_sequence_bases,
@@ -74,7 +76,7 @@ impl<Scalar: PrimeField + PrimeFieldBits> BasicAlignmentCircuit<Scalar> {
             target_sequence_bases,
             cigar_string_felts,
             cigar_string_chars,
-            alignment_score,
+            alignment_score: positive_alignment_score,
             _p: PhantomData,
         }
     }
@@ -82,28 +84,13 @@ impl<Scalar: PrimeField + PrimeFieldBits> BasicAlignmentCircuit<Scalar> {
 
 impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
     fn public_values(&self) -> Result<Vec<<E as Engine>::Scalar>, SynthesisError> {
-        // let default_poseidon_params = Sponge::<<E as Engine>::Scalar, U2>::api_constants(Strength::Standard);
-        // let parameter = IOPattern(vec![
-        //     SpongeOp::Absorb(self.preimage.len() as u32),
-        //     SpongeOp::Squeeze(1),
-        // ]);
-        // let mut sponge = Sponge::<<E as Engine>::Scalar, U2>::new_with_constants(&default_poseidon_params, Mode::Simplex);
-        // let acc = &mut ();
-
-        // sponge.start(parameter, None, acc);
-        // SpongeAPI::absorb(&mut sponge, self.preimage.len() as u32, &self.preimage, acc);
-
-        // let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        // assert_eq!(output.len(), 1);
-
-        // sponge.finish(acc).unwrap();
         let mut public_values = Vec::new();
 
         for block in &self.reference_sequence_felts {
             public_values.push(block.clone());
         }
 
-        let public_score = <E as Engine>::Scalar::from_u128(self.alignment_score as u128);
+        let public_score = <E as Engine>::Scalar::from_u128((self.alignment_score) as u128);
         public_values.push(public_score);
 
         Ok(public_values)
@@ -217,7 +204,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 cs.namespace(|| format!("Target sequence felt block {i} decomposition")),
                 Some(self.target_sequence_felts[i]),
             )?;
-            for j in (0..BASES_PER_BLOCK) {
+            for j in 0..BASES_PER_BLOCK {
                 cs.enforce(
                     || {
                         format!(
@@ -253,7 +240,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 cs.namespace(|| format!("Reference sequence felt block {i} decomposition")),
                 Some(self.reference_sequence_felts[i]),
             )?;
-            for j in (0..BASES_PER_BLOCK) {
+            for j in 0..BASES_PER_BLOCK {
                 cs.enforce(
                     || {
                         format!(
@@ -289,7 +276,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 cs.namespace(|| format!("Cigar string felt block {i} decomposition")),
                 Some(self.cigar_string_felts[i]),
             )?;
-            for j in (0..BASES_PER_BLOCK) {
+            for j in 0..BASES_PER_BLOCK {
                 cs.enforce(
                     || format!("Enforcing base decomposition for cigar string block {i} char {j}"),
                     |lc| lc + CS::one(),

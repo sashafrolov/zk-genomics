@@ -1,11 +1,10 @@
 pub mod alignment_plain_computation;
 
-use ff::{PrimeField, PrimeFieldBits, FromUniformBytes};
 use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
+use ff::{FromUniformBytes, PrimeField, PrimeFieldBits};
 use rand::RngCore;
 
 use bellpepper::gadgets::multipack::compute_multipacking;
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Base {
@@ -48,7 +47,7 @@ impl Base {
     pub fn random_sequence(n: usize) -> Vec<Base> {
         let mut rng = rand::thread_rng();
         (0..n)
-            .map(|_| match rng.next_u32() % 4{
+            .map(|_| match rng.next_u32() % 4 {
                 0 => Base::A,
                 1 => Base::C,
                 2 => Base::G,
@@ -105,7 +104,11 @@ impl ToFeltBlocks for Vec<Base> {
     fn to_felt_blocks<F: PrimeField + PrimeFieldBits>(&self, bases_per_block: usize) -> Vec<F> {
         let mut base_chunks = Vec::new();
         for chunk in self.chunks(bases_per_block) {
-            let chunk_as_bools = chunk.into_iter().map(|base| vec![base.to_bool_pair().0, base.to_bool_pair().1]).flatten().collect::<Vec<_>>();
+            let chunk_as_bools = chunk
+                .into_iter()
+                .map(|base| vec![base.to_bool_pair().0, base.to_bool_pair().1])
+                .flatten()
+                .collect::<Vec<_>>();
 
             let chunk_felt = compute_multipacking(&chunk_as_bools);
             base_chunks.push(chunk_felt[0]);
@@ -114,12 +117,15 @@ impl ToFeltBlocks for Vec<Base> {
     }
 }
 
-
 impl ToFeltBlocks for Vec<CigarChar> {
     fn to_felt_blocks<F: PrimeField + PrimeFieldBits>(&self, chars_per_block: usize) -> Vec<F> {
         let mut base_chunks = Vec::new();
         for chunk in self.chunks(chars_per_block) {
-            let chunk_as_bools = chunk.into_iter().map(|base| vec![base.to_bool_pair().0, base.to_bool_pair().1]).flatten().collect::<Vec<_>>();
+            let chunk_as_bools = chunk
+                .into_iter()
+                .map(|base| vec![base.to_bool_pair().0, base.to_bool_pair().1])
+                .flatten()
+                .collect::<Vec<_>>();
 
             let chunk_felt = compute_multipacking(&chunk_as_bools);
             base_chunks.push(chunk_felt[0]);
@@ -159,13 +165,14 @@ impl MSACigarChar {
     }
 }
 
-
-
 impl ToFeltBlocks for Vec<MSACigarChar> {
     fn to_felt_blocks<F: PrimeField + PrimeFieldBits>(&self, chars_per_block: usize) -> Vec<F> {
         let mut base_chunks = Vec::new();
         for chunk in self.chunks(chars_per_block) {
-            let chunk_as_bools = chunk.into_iter().map(|msa_char| msa_char.to_bool()).collect::<Vec<_>>();
+            let chunk_as_bools = chunk
+                .into_iter()
+                .map(|msa_char| msa_char.to_bool())
+                .collect::<Vec<_>>();
 
             let chunk_felt = compute_multipacking(&chunk_as_bools);
             base_chunks.push(chunk_felt[0]);
@@ -173,7 +180,6 @@ impl ToFeltBlocks for Vec<MSACigarChar> {
         base_chunks
     }
 }
-
 
 // /// Generate default parameters (bls381-fr-only) for alpha = 17, state-size = 8
 // pub fn poseidon_parameters_for_test<F: PrimeField>() -> PoseidonConfig<F> {

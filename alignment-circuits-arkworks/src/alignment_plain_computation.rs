@@ -1,6 +1,5 @@
 use crate::{Base, CigarChar};
 
-
 /// Computes an optimal global pairwise alignment between two DNA sequences using the
 /// Needleman-Wunsch algorithm and returns a CIGAR string representation of the alignment
 /// along with the alignment score.
@@ -9,7 +8,7 @@ use crate::{Base, CigarChar};
 /// - Match: bases align (match or mismatch in the sequences)
 /// - Insert: insertion relative to reference (gap in reference)
 /// - Delete: deletion relative to reference (gap in target)
-/// 
+///
 /// Credit to this github repo: https://github.com/kensho-technologies/sequence_align/tree/main
 /// for the original source this is adapted from.
 /// TODO: Unify the gap_score argument with match/mismatch score.
@@ -166,8 +165,6 @@ pub fn affine_gap_alignment(
 // Affine: do here
 // Multiple sequence alignment: not yet sure.
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,18 +173,12 @@ mod tests {
     fn test_basic_alignment_simple() {
         let reference = vec![Base::A, Base::C, Base::G, Base::T];
         let target = vec![Base::A, Base::G, Base::T];
-        
-        let (cigar, score) = basic_alignment(
-            reference,
-            target,
-            1.0, 
-            -1.0,
-            -1.0,
-        );
-        
+
+        let (cigar, score) = basic_alignment(reference, target, 1.0, -1.0, -1.0);
+
         println!("CIGAR: {:?}", cigar);
         println!("Score: {}", score);
-        
+
         assert_eq!(cigar.len(), 4);
         assert_eq!(cigar[0], CigarChar::Match);
         assert_eq!(cigar[1], CigarChar::Delete);
@@ -199,20 +190,14 @@ mod tests {
     fn test_basic_alignment_with_insertion() {
         let reference = vec![Base::A, Base::G, Base::T];
         let target = vec![Base::A, Base::C, Base::G, Base::T];
-        
-        let (cigar, score) = basic_alignment(
-            reference,
-            target,
-            1.0,
-            -1.0,
-            -1.0,
-        );
-        
+
+        let (cigar, score) = basic_alignment(reference, target, 1.0, -1.0, -1.0);
+
         println!("CIGAR: {:?}", cigar);
         println!("Score: {}", score);
-        
+
         assert_eq!(cigar.len(), 4);
-        assert_eq!(cigar[0], CigarChar::Match); 
+        assert_eq!(cigar[0], CigarChar::Match);
         assert_eq!(cigar[1], CigarChar::Insert);
         assert_eq!(cigar[2], CigarChar::Match);
         assert_eq!(cigar[3], CigarChar::Match);
@@ -221,7 +206,7 @@ mod tests {
     // fn test_basic_alignment_with_gap() {
     //     let reference = vec![Base::T, Base::C, Base::G, Base::T];
     //     let target = vec![Base::A, Base::C, Base::G, Base::T];
-        
+
     //     let (cigar, score) = basic_alignment(
     //         reference,
     //         target,
@@ -229,12 +214,12 @@ mod tests {
     //         -1.0,
     //         -1.0,
     //     );
-        
+
     //     println!("CIGAR: {:?}", cigar);
     //     println!("Score: {}", score);
-        
+
     //     assert_eq!(cigar.len(), 4);
-    //     assert_eq!(cigar[0], CigarChar::Match); 
+    //     assert_eq!(cigar[0], CigarChar::Match);
     //     assert_eq!(cigar[1], CigarChar::Insert);
     //     assert_eq!(cigar[2], CigarChar::Match);
     //     assert_eq!(cigar[3], CigarChar::Match);
@@ -244,18 +229,12 @@ mod tests {
     fn test_basic_alignment_perfect_match() {
         // Test case: perfect match
         let sequence = vec![Base::A, Base::C, Base::G, Base::T];
-        
-        let (cigar, score) = basic_alignment(
-            sequence.clone(),
-            sequence.clone(),
-            1.0,
-            -1.0,
-            -1.0,
-        );
-        
+
+        let (cigar, score) = basic_alignment(sequence.clone(), sequence.clone(), 1.0, -1.0, -1.0);
+
         println!("CIGAR: {:?}", cigar);
         println!("Score: {}", score);
-        
+
         assert_eq!(cigar.len(), 4);
         assert!(cigar.iter().all(|&c| c == CigarChar::Match));
         assert_eq!(score, 4);
@@ -263,14 +242,8 @@ mod tests {
 
     #[test]
     fn test_basic_alignment_empty_sequences() {
-        let (cigar, score) = basic_alignment(
-            vec![],
-            vec![],
-            1.0,
-            -1.0,
-            -1.0,
-        );
-        
+        let (cigar, score) = basic_alignment(vec![], vec![], 1.0, -1.0, -1.0);
+
         assert_eq!(cigar.len(), 0);
         assert_eq!(score, 0);
     }
@@ -278,15 +251,9 @@ mod tests {
     #[test]
     fn test_basic_alignment_one_empty() {
         let reference = vec![Base::A, Base::C, Base::G];
-        
-        let (cigar, score) = basic_alignment(
-            reference.clone(),
-            vec![],
-            1.0,
-            -1.0,
-            -1.0,
-        );
-        
+
+        let (cigar, score) = basic_alignment(reference.clone(), vec![], 1.0, -1.0, -1.0);
+
         // All deletes
         assert_eq!(cigar.len(), 3);
         assert!(cigar.iter().all(|&c| c == CigarChar::Delete));

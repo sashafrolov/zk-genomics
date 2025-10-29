@@ -66,11 +66,11 @@ fn main() {
     let prover_data_string = format!("{:?}", prover_data);
     let start_marker = "digest_layers: [[[";
     let end_marker = "]]]";
-    
+
     let start = prover_data_string.find(start_marker).unwrap() + start_marker.len();
     let end = prover_data_string[start..].find(end_marker).unwrap() + start;
 
-    let merkle_tree_string = &prover_data_string[start..end]; 
+    let merkle_tree_string = &prover_data_string[start..end];
 
     // hacky way to get number of hashes in merkle tree since this library is not great about exposing everything i want.
     let hashes_in_merkle_tree = merkle_tree_string.matches(", [").count() + 1;

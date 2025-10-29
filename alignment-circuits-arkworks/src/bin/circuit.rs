@@ -6,25 +6,25 @@ use ark_crypto_primitives::sponge::poseidon::constraints::PoseidonSpongeVar;
 // use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
 
 // use ark_crypto_primitives::sponge::{CryptographicSponge, FieldBasedCryptographicSponge};
-use ark_ff::vec::Vec;
 use ark_ff::PrimeField;
+use ark_ff::vec::Vec;
 // use ark_ff::UniformRand;
 use ark_ff::{BigInt, BigInteger};
 use ark_groth16::Groth16;
-use ark_r1cs_std::fields::fp::FpVar;
 use ark_r1cs_std::convert::ToBitsGadget;
 use ark_r1cs_std::convert::ToConstraintFieldGadget;
-use ark_r1cs_std::{prelude::*};
+use ark_r1cs_std::fields::fp::FpVar;
+use ark_r1cs_std::prelude::*;
 use ark_relations::r1cs::ConstraintSystem;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 // use ark_relations::*;
+use ark_std::Zero;
 use ark_std::rand::{RngCore, SeedableRng};
 use ark_std::test_rng;
-use ark_std::Zero;
 // use ark_std::time::{SystemTime, UNIX_EPOCH};
-use rand::Rng;
 use alignment_circuits::poseidon_parameters_for_test;
 use ark_relations::r1cs::{ConstraintLayer, TracingMode};
+use rand::Rng;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const BASES_PER_BLOCK: usize = 125;
@@ -33,13 +33,12 @@ const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
 const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
 
-
 pub struct AlignmentCircuit<F: PrimeField> {
     pub reference_sequence_felts: Vec<F>, // The reference for a certain gene, encoded as field elements, where 125 bases are packed per field element
     pub reference_sequence_bases: Vec<usize>, // Reference sequence encoded as usize's between 0 and 4
-    pub target_sequence_felts: Vec<F>, // The value being aligned against the target
+    pub target_sequence_felts: Vec<F>,        // The value being aligned against the target
     pub target_sequence_bases: Vec<usize>,
-    pub cigar_string_felts: Vec<F>, // Not fully a CIGAR string yet
+    pub cigar_string_felts: Vec<F>,     // Not fully a CIGAR string yet
     pub cigar_string_bases: Vec<usize>, // encoded as usizes between 0 and 3
     pub alignment_score: usize, // claimed alignment score which is a public output. 0 is perfect, +1 for each insertion or deletion in the basic version.
 }
@@ -123,7 +122,8 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
             let block_bits = &block.to_bits_le().unwrap();
             let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
-                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
+                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0]
+                    + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 reference_bases.push(new_bp);
             }
             for bit in &block_bits[250..] {
@@ -136,7 +136,8 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
             let block_bits = &block.to_bits_le().unwrap();
             let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
-                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
+                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0]
+                    + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 target_bases.push(new_bp);
             }
             for bit in &block_bits[250..] {
@@ -149,7 +150,8 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
             let block_bits = &block.to_bits_le().unwrap();
             let mut chunks = block_bits[0..250].chunks_exact(2);
             for bit_pair in chunks.by_ref().take(BASES_PER_BLOCK) {
-                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0] + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
+                let new_bp = &bit_pair[0].to_constraint_field().unwrap()[0]
+                    + &two * &bit_pair[1].to_constraint_field().unwrap()[0];
                 cigar_chars.push(new_bp);
             }
             for bit in &block_bits[250..] {
@@ -158,11 +160,16 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
         }
 
         let mut target_string_memcheck_prod_1 = FpVar::new_constant(cs.clone(), F::one()).unwrap();
-        let mut reference_string_memcheck_prod_1 = FpVar::new_constant(cs.clone(), F::one()).unwrap();
+        let mut reference_string_memcheck_prod_1 =
+            FpVar::new_constant(cs.clone(), F::one()).unwrap();
         let mut i_felt = F::zero();
         for i in 0..reference_bases.len() {
-            target_string_memcheck_prod_1 *= &challenge_vars[0] + &target_bases[i] + FpVar::new_constant(cs.clone(), i_felt).unwrap() * &challenge_vars[1];
-            reference_string_memcheck_prod_1 *= &challenge_vars[0] + &reference_bases[i] + FpVar::new_constant(cs.clone(), i_felt).unwrap() * &challenge_vars[1];
+            target_string_memcheck_prod_1 *= &challenge_vars[0]
+                + &target_bases[i]
+                + FpVar::new_constant(cs.clone(), i_felt).unwrap() * &challenge_vars[1];
+            reference_string_memcheck_prod_1 *= &challenge_vars[0]
+                + &reference_bases[i]
+                + FpVar::new_constant(cs.clone(), i_felt).unwrap() * &challenge_vars[1];
             i_felt += F::one();
         }
 
@@ -171,44 +178,86 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
         let insertion = FpVar::new_constant(cs.clone(), F::one()).unwrap();
         let deletion = FpVar::new_constant(cs.clone(), F::one() + F::one()).unwrap();
 
-
         let mut target_index_var = FpVar::new_constant(cs.clone(), F::zero()).unwrap();
         let mut reference_index_var = FpVar::new_constant(cs.clone(), F::zero()).unwrap();
         let mut target_index = 0usize;
         let mut reference_index = 0usize;
         let mut target_string_memcheck_prod_2 = FpVar::new_constant(cs.clone(), F::one()).unwrap();
-        let mut reference_string_memcheck_prod_2 = FpVar::new_constant(cs.clone(), F::one()).unwrap();
+        let mut reference_string_memcheck_prod_2 =
+            FpVar::new_constant(cs.clone(), F::one()).unwrap();
         let mut alignment_score = FpVar::new_constant(cs.clone(), F::zero()).unwrap();
         for i in 0..cigar_chars.len() {
             let is_match = cigar_chars[i].is_eq(&alignment_match).unwrap();
             let is_insertion = cigar_chars[i].is_eq(&insertion).unwrap();
             let is_deletion = cigar_chars[i].is_eq(&deletion).unwrap();
-            alignment_score += &is_deletion.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0];
+            alignment_score += &is_deletion.to_constraint_field().unwrap()[0]
+                + &is_insertion.to_constraint_field().unwrap()[0];
 
-            let target_sequence_read_val = FpVar::new_witness(cs.clone(), || Ok(usize_to_felt::<F>(self.target_sequence_bases[i]))).unwrap();
-            let reference_sequence_read_val = FpVar::new_witness(cs.clone(), || Ok(usize_to_felt::<F>(self.reference_sequence_bases[i]))).unwrap();
+            let target_sequence_read_val = FpVar::new_witness(cs.clone(), || {
+                Ok(usize_to_felt::<F>(self.target_sequence_bases[i]))
+            })
+            .unwrap();
+            let reference_sequence_read_val = FpVar::new_witness(cs.clone(), || {
+                Ok(usize_to_felt::<F>(self.reference_sequence_bases[i]))
+            })
+            .unwrap();
 
             // if is_match, bases_match must be true. if not is match either is fine.
-            let bases_match = target_sequence_read_val.is_eq(&reference_sequence_read_val).unwrap();
-            ((!&is_match) | (&bases_match)).enforce_equal(&Boolean::<F>::TRUE).unwrap();
+            let bases_match = target_sequence_read_val
+                .is_eq(&reference_sequence_read_val)
+                .unwrap();
+            ((!&is_match) | (&bases_match))
+                .enforce_equal(&Boolean::<F>::TRUE)
+                .unwrap();
 
-            target_string_memcheck_prod_2 *= (&is_match | &is_insertion).select(&(&challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
-            reference_string_memcheck_prod_2 *= (&is_match | &is_deletion).select(&(&challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
+            target_string_memcheck_prod_2 *= (&is_match | &is_insertion)
+                .select(
+                    &(&challenge_vars[0]
+                        + &target_sequence_read_val
+                        + &target_index_var * &challenge_vars[1]),
+                    &FpVar::new_constant(cs.clone(), F::one()).unwrap(),
+                )
+                .unwrap();
+            reference_string_memcheck_prod_2 *= (&is_match | &is_deletion)
+                .select(
+                    &(&challenge_vars[0]
+                        + &reference_sequence_read_val
+                        + &reference_index_var * &challenge_vars[1]),
+                    &FpVar::new_constant(cs.clone(), F::one()).unwrap(),
+                )
+                .unwrap();
 
-            target_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_insertion.to_constraint_field().unwrap()[0];
-            reference_index_var += &is_match.to_constraint_field().unwrap()[0] + &is_deletion.to_constraint_field().unwrap()[0];
+            target_index_var += &is_match.to_constraint_field().unwrap()[0]
+                + &is_insertion.to_constraint_field().unwrap()[0];
+            reference_index_var += &is_match.to_constraint_field().unwrap()[0]
+                + &is_deletion.to_constraint_field().unwrap()[0];
             match self.cigar_string_bases[i] {
-                0 => {target_index+=1; reference_index +=1},
-                1 => {target_index+=1;},
-                2 => {reference_index +=1},
-                _ => {panic!("Witness generation reached an incorrect CIGAR character")}
+                0 => {
+                    target_index += 1;
+                    reference_index += 1
+                }
+                1 => {
+                    target_index += 1;
+                }
+                2 => reference_index += 1,
+                _ => {
+                    panic!("Witness generation reached an incorrect CIGAR character")
+                }
             }
         }
 
-        target_string_memcheck_prod_1.enforce_equal(&target_string_memcheck_prod_2).unwrap();
-        reference_string_memcheck_prod_1.enforce_equal(&reference_string_memcheck_prod_2).unwrap();
+        target_string_memcheck_prod_1
+            .enforce_equal(&target_string_memcheck_prod_2)
+            .unwrap();
+        reference_string_memcheck_prod_1
+            .enforce_equal(&reference_string_memcheck_prod_2)
+            .unwrap();
 
-        let res_score = FpVar::<F>::new_input(cs.clone(), || Ok(F::from_le_bytes_mod_order(&self.alignment_score.to_le_bytes())))?;
+        let res_score = FpVar::<F>::new_input(cs.clone(), || {
+            Ok(F::from_le_bytes_mod_order(
+                &self.alignment_score.to_le_bytes(),
+            ))
+        })?;
         res_score.enforce_equal(&alignment_score).unwrap();
 
         Ok(())
@@ -217,22 +266,29 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for AlignmentCircuit<F> {
 
 fn generate_random_sequence(bases: usize) -> (Vec<Fr>, Vec<usize>) {
     let rng = &mut ark_std::test_rng();
-    let random_bools = (0..bases).map(|_| vec![rng.gen_bool(0.5), rng.gen_bool(0.5)]).collect::<Vec<_>>();
-    let random_bases = random_bools.clone().into_iter().map(|x| (x[1] as usize) * 2 + (x[0] as usize)).collect::<Vec<_>>();
+    let random_bools = (0..bases)
+        .map(|_| vec![rng.gen_bool(0.5), rng.gen_bool(0.5)])
+        .collect::<Vec<_>>();
+    let random_bases = random_bools
+        .clone()
+        .into_iter()
+        .map(|x| (x[1] as usize) * 2 + (x[0] as usize))
+        .collect::<Vec<_>>();
 
-    let random_felts = 
-            random_bools.clone()
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>()
-                .chunks(BASES_PER_BLOCK * 2)
-                .map(|x| {
-                    let mut x_vec = vec![];
-                    let five_false =  vec![false; 5]; // need to pad x with 0's so this behaves as expected.
-                    x_vec.extend_from_slice(x);
-                    x_vec.extend_from_slice(&five_false);
-                    Fr::from_bigint(BigInt::from_bits_le(&x_vec)).unwrap()})
-                .collect();
+    let random_felts = random_bools
+        .clone()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .chunks(BASES_PER_BLOCK * 2)
+        .map(|x| {
+            let mut x_vec = vec![];
+            let five_false = vec![false; 5]; // need to pad x with 0's so this behaves as expected.
+            x_vec.extend_from_slice(x);
+            x_vec.extend_from_slice(&five_false);
+            Fr::from_bigint(BigInt::from_bits_le(&x_vec)).unwrap()
+        })
+        .collect();
     (random_felts, random_bases)
 }
 
@@ -249,16 +305,30 @@ fn usize_to_felt<F: PrimeField>(base: usize) -> F {
 fn main() {
     // For benchmarking, just verify the alignment of 2 identical sequences, I did correctness testing separately.
     // zk proofs are a uniform model of computation so data used is not overly important.
-    let (reference_sequence_felts, reference_sequence_bases) = generate_random_sequence(SEQUENCE_BASE_PAIRS);
-    let (target_sequence_felts, target_sequence_bases) = (reference_sequence_felts.clone(), reference_sequence_bases.clone());
+    let (reference_sequence_felts, reference_sequence_bases) =
+        generate_random_sequence(SEQUENCE_BASE_PAIRS);
+    let (target_sequence_felts, target_sequence_bases) = (
+        reference_sequence_felts.clone(),
+        reference_sequence_bases.clone(),
+    );
 
-    let cigar_string_felts: Vec<_> = (0..CIGAR_STRING_LENGTH_BLOCKS).map(|_| Fr::zero()).collect();
+    let cigar_string_felts: Vec<_> = (0..CIGAR_STRING_LENGTH_BLOCKS)
+        .map(|_| Fr::zero())
+        .collect();
     let cigar_string_letters = (0..CIGAR_STRING_LENGTH).map(|_| 0).collect::<Vec<_>>();
     let alignment_score = 0;
 
     println!("Sequence length is: {}", SEQUENCE_BASE_PAIRS);
 
-    let c = AlignmentCircuit::<Fr>::new(reference_sequence_felts.clone(), reference_sequence_bases.clone(), target_sequence_felts.clone(), target_sequence_bases.clone(), cigar_string_felts.clone(), cigar_string_letters.clone(), alignment_score);
+    let c = AlignmentCircuit::<Fr>::new(
+        reference_sequence_felts.clone(),
+        reference_sequence_bases.clone(),
+        target_sequence_felts.clone(),
+        target_sequence_bases.clone(),
+        cigar_string_felts.clone(),
+        cigar_string_letters.clone(),
+        alignment_score,
+    );
     {
         // let mut layer = ConstraintLayer::default();
         // layer.mode = TracingMode::OnlyConstraints;

@@ -34,7 +34,7 @@ use alignment_circuits::alignment_plain_computation::basic_alignment;
 type E = T256HyraxEngine;
 
 const BASES_PER_BLOCK: usize = 125;
-const SEQUENCE_BLOCK_LENGTH: usize = 1 << 4;
+const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
 const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);

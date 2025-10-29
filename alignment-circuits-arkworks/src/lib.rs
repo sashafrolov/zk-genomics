@@ -128,6 +128,52 @@ impl ToFeltBlocks for Vec<CigarChar> {
     }
 }
 
+// Analogue of a CIGAR character for multiple sequence alignment. Not quite the same thing, wanted to distinguish.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MSACigarChar {
+    Match,
+    Gap,
+}
+
+impl MSACigarChar {
+    pub fn to_field<F: PrimeField>(&self) -> F {
+        match self {
+            MSACigarChar::Match => F::from(0u64),
+            MSACigarChar::Gap => F::from(1u64),
+        }
+    }
+
+    pub fn from_field<F: PrimeField + PrimeFieldBits>(x: F) -> Option<Self> {
+        let b = x.to_le_bits()[0];
+        match b {
+            false => Some(MSACigarChar::Match),
+            true => Some(MSACigarChar::Gap),
+        }
+    }
+
+    pub fn to_bool(&self) -> bool {
+        match self {
+            MSACigarChar::Match => false,
+            MSACigarChar::Gap => true,
+        }
+    }
+}
+
+
+
+impl ToFeltBlocks for Vec<MSACigarChar> {
+    fn to_felt_blocks<F: PrimeField + PrimeFieldBits>(&self, chars_per_block: usize) -> Vec<F> {
+        let mut base_chunks = Vec::new();
+        for chunk in self.chunks(chars_per_block) {
+            let chunk_as_bools = chunk.into_iter().map(|msa_char| msa_char.to_bool()).collect::<Vec<_>>();
+
+            let chunk_felt = compute_multipacking(&chunk_as_bools);
+            base_chunks.push(chunk_felt[0]);
+        }
+        base_chunks
+    }
+}
+
 
 // /// Generate default parameters (bls381-fr-only) for alpha = 17, state-size = 8
 // pub fn poseidon_parameters_for_test<F: PrimeField>() -> PoseidonConfig<F> {

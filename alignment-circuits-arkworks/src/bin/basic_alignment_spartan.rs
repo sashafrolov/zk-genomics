@@ -276,23 +276,27 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
     // 4. Verify alignment: 
 
     // Initialize LHS of memcheck products
-    // TODO: Update the memcheck computation to include indices with random linear combination.
     let mut target_sequence_memcheck_product_left = AllocatedNum::alloc(cs.namespace(|| "Initial target sequence left memcheck product"), || Ok(E::Scalar::ONE))?;
     for (i, base) in target_sequence_base_vars.iter().enumerate() {
-      let addition = base.add(cs.namespace(|| format!("Left target memcheck product addition {i}")), &memcheck_challenge_0)?;
-      target_sequence_memcheck_product_left = target_sequence_memcheck_product_left.mul(cs.namespace(|| format!("Left target memcheck product multiplication {i}")), &addition)?;
+      let addition_1 = base.add(cs.namespace(|| format!("Left target memcheck product {i} addition 1")), &memcheck_challenge_0)?;
+      let index_var = AllocatedNum::alloc(cs.namespace(|| format!("Constant var for left target memcheck representing {i}")), || Ok(E::Scalar::from_u128(i as u128)))?;
+      let multiplication_1 = index_var.mul(cs.namespace(|| format!("Left target memcheck product {i} multiplication 1")), &memcheck_challenge_1)?;
+      let addition_2 = multiplication_1.add(cs.namespace(|| format!("Left target memcheck product {i} addition 2")), &addition_1)?;
+      target_sequence_memcheck_product_left = target_sequence_memcheck_product_left.mul(cs.namespace(|| format!("Left target memcheck product {i} multiplication 2")), &addition_2)?;
     }
     
     let mut reference_sequence_memcheck_product_left = AllocatedNum::alloc(cs.namespace(|| "Initial reference sequence left memcheck product"), || Ok(E::Scalar::ONE))?;
     for (i, base) in reference_sequence_base_vars.iter().enumerate() {
-      let addition = base.add(cs.namespace(|| format!("Left reference memcheck product addition {i}")), &memcheck_challenge_0)?;
-      reference_sequence_memcheck_product_left = reference_sequence_memcheck_product_left.mul(cs.namespace(|| format!("Left reference memcheck product multiplication {i}")), &addition)?;
+      let addition_1 = base.add(cs.namespace(|| format!("Left reference memcheck product {i} addition 1")), &memcheck_challenge_0)?;
+      let index_var = AllocatedNum::alloc(cs.namespace(|| format!("Constant var for left reference memcheck representing {i}")), || Ok(E::Scalar::from_u128(i as u128)))?;
+      let multiplication_1 = index_var.mul(cs.namespace(|| format!("Left reference memcheck product {i} multiplication 1")), &memcheck_challenge_1)?;
+      let addition_2 = multiplication_1.add(cs.namespace(|| format!("Left reference memcheck product {i} addition 2")), &addition_1)?;
+      reference_sequence_memcheck_product_left = reference_sequence_memcheck_product_left.mul(cs.namespace(|| format!("Left reference memcheck product {i} multiplication 2")), &addition_2)?;
     }
     
     // Constants
-    let ALIGNMENT_MATCH = AllocatedNum::alloc(cs.namespace(|| "match constant"), || Ok(E::Scalar::ZERO))?;
-    let INSERTION = AllocatedNum::alloc(cs.namespace(|| "insertion constant"), || Ok(E::Scalar::ONE))?;
-    let DELETION = AllocatedNum::alloc(cs.namespace(|| "deletion constant"), || Ok(E::Scalar::from_u128(2u128)))?;
+    let ONE = AllocatedNum::alloc(cs.namespace(|| "One constant"), || Ok(E::Scalar::ONE))?;
+    let MINUS_ONE = AllocatedNum::alloc(cs.namespace(|| "Negative one constant"), || Ok(-E::Scalar::ONE))?;
 
     // Initialize variables that get updated in the loop
     let mut target_index_var = AllocatedNum::alloc(cs.namespace(|| "Initial index into target string"), || Ok(E::Scalar::ZERO))?;
@@ -342,17 +346,47 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
       let target_sequence_read_val = AllocatedNum::alloc(cs.namespace(|| format!("Reading value from target sequence for cigar char {i}")), || Ok(self.target_sequence_bases[target_index].to_field()))?;
       let reference_sequence_read_val = AllocatedNum::alloc(cs.namespace(|| format!("Reading value from reference sequence for cigar char {i}")), || Ok(self.reference_sequence_bases[reference_index].to_field()))?;
 
-      // Update the memcheck product with the read values.
-      // TODO: Factor in the read index for security.
-      
-      // target_sequence_memcheck_product_right *= (&is_match | &is_insertion).select(&(&challenge_vars[0] + &target_sequence_read_val + &target_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
-      
+      // Update the memcheck products with the read values.
       let is_target_sequence_read_from = (self.cigar_string_chars[i] == CigarChar::Match) || (self.cigar_string_chars[i] == CigarChar::Insert); 
-      let target_memcheck_addition_1 = target_sequence_read_val.add(cs.namespace(|| format!("Right target memcheck product addition {i}")), &memcheck_challenge_0)?;
-      // Add the conditional
-      target_sequence_memcheck_product_right = target_sequence_memcheck_product_right.mul(cs.namespace(|| format!("Right target memcheck product multiplication {i}")), &target_memcheck_addition_1)?;
+      let is_target_sequence_read_from_bit = AllocatedNum::alloc(cs.namespace(|| format!("Is target sequence read from index {i}")), || Ok(if is_target_sequence_read_from {E::Scalar::ONE} else {E::Scalar::ZERO}))?;
+      // Enforce OR constraint (rearranging a + b - a*b = a || b)
+      cs.enforce(|| format!("Enforcing OR constraint for target sequence is read from bit {i}"),
+        |lc| lc + is_match.get_variable(),
+        |lc| lc + is_insertion.get_variable(),
+        |lc| lc + is_match.get_variable() + is_insertion.get_variable() - is_target_sequence_read_from_bit.get_variable(),
+      );
+      // Build up the memcheck polynomial root (read_val + index*chall_1 + chall_0)
+      let target_memcheck_addition_1 = target_sequence_read_val.add(cs.namespace(|| format!("Right target memcheck product {i} addition 1")), &memcheck_challenge_0)?;
+      let target_memcheck_multiplication_1 = target_index_var.mul(cs.namespace(|| format!("Right target memcheck product {i} multiplication 1")), &memcheck_challenge_1)?;
+      let target_memcheck_addition_2 = target_memcheck_multiplication_1.add(cs.namespace(|| format!("Right target memcheck product {i} addition 2")), &target_memcheck_addition_1)?;
       
-      reference_sequence_memcheck_product_right *= (&is_match | &is_deletion).select(&(&challenge_vars[0] + &reference_sequence_read_val + &reference_index_var * &challenge_vars[1]), &FpVar::new_constant(cs.clone(), F::one()).unwrap()).unwrap();
+      // Perform a select operation (if is_target_sequence_read_from then target_memcheck_addition_1 else 1
+      let target_memcheck_select_addition_1 = target_memcheck_addition_2.add(cs.namespace(|| format!("Right target memcheck {i} select first addition")), &MINUS_ONE)?;
+      let target_memcheck_select_mul_1 = target_memcheck_select_addition_1.mul(cs.namespace(|| format!("Right target memcheck {i} select first multiplication")), &is_target_sequence_read_from_bit)?;
+      let target_memcheck_select_addition_2 = target_memcheck_select_mul_1.add(cs.namespace(|| format!("Right target memcheck {i} select second addition")), &ONE)?;
+
+      target_sequence_memcheck_product_right = target_sequence_memcheck_product_right.mul(cs.namespace(|| format!("Right target memcheck product multiplication {i}")), &target_memcheck_select_addition_2)?;
+    
+    
+      let is_reference_sequence_read_from = (self.cigar_string_chars[i] == CigarChar::Match) || (self.cigar_string_chars[i] == CigarChar::Delete); 
+      let is_reference_sequence_read_from_bit = AllocatedNum::alloc(cs.namespace(|| format!("Is reference sequence read from index {i}")), || Ok(if is_reference_sequence_read_from {E::Scalar::ONE} else {E::Scalar::ZERO}))?;
+      // Enforce OR constraint (rearranging a + b - a*b = a || b)
+      cs.enforce(|| format!("Enforcing OR constraint for reference sequence is read from bit {i}"),
+        |lc| lc + is_match.get_variable(),
+        |lc| lc + is_deletion.get_variable(),
+        |lc| lc + is_match.get_variable() + is_deletion.get_variable() - is_reference_sequence_read_from_bit.get_variable(),
+      );
+      // Build up the memcheck polynomial root (read_val + index*chall_1 + chall_0)
+      let reference_memcheck_addition_1 = reference_sequence_read_val.add(cs.namespace(|| format!("Right reference memcheck product {i} addition 1")), &memcheck_challenge_0)?;
+      let reference_memcheck_multiplication_1 = reference_index_var.mul(cs.namespace(|| format!("Right reference memcheck product {i} multiplication 1")), &memcheck_challenge_1)?;
+      let reference_memcheck_addition_2 = reference_memcheck_multiplication_1.add(cs.namespace(|| format!("Right reference memcheck product {i} addition 2")), &reference_memcheck_addition_1)?;
+      
+      // Perform a select operation (if is_target_sequence_read_from then target_memcheck_addition_1 else 1
+      let reference_memcheck_select_addition_1 = reference_memcheck_addition_2.add(cs.namespace(|| format!("Right reference memcheck {i} select first addition")), &MINUS_ONE)?;
+      let reference_memcheck_select_mul_1 = reference_memcheck_select_addition_1.mul(cs.namespace(|| format!("Right reference memcheck {i} select first multiplication")), &is_reference_sequence_read_from_bit)?;
+      let reference_memcheck_select_addition_2 = reference_memcheck_select_mul_1.add(cs.namespace(|| format!("Right reference memcheck {i} select second addition")), &ONE)?;
+
+      reference_sequence_memcheck_product_right = reference_sequence_memcheck_product_right.mul(cs.namespace(|| format!("Right reference memcheck product multiplication {i}")), &reference_memcheck_select_addition_2)?;
 
       // Assert that, if the CIGAR string says that characters match, then there is an actual match.
       // Equality check.

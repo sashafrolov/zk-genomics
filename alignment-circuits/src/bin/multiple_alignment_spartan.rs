@@ -1,6 +1,5 @@
-//! examples/basic_alignment.rs
-//! Spartan version of the alignment circuit previously written
-//! in Arkworks. Similar, just a lot faster.
+//! examples/multiple_alignment_spartan.rs
+//! A simple multiple alignment circuit written in Spartan.
 //!
 #![allow(non_snake_case)]
 #[cfg(feature = "jem")]
@@ -36,8 +35,10 @@ type E = T256HyraxEngine;
 const BASES_PER_BLOCK: usize = 125;
 const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
-// const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
-// const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);
+const CIGAR_CHARS_PER_BLOCK: usize = 250; // For Multiple Sequences, CIGAR chars just have 2 options.
+const NUM_ALIGNED_SEQUENCES: usize = 10;
+
+// TODO: stopped doing the update here.
 
 #[derive(Clone, Debug)]
 struct BasicAlignmentCircuit<Scalar: PrimeField> {

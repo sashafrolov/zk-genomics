@@ -1,4 +1,4 @@
-//! examples/basic_alignment.rs
+//! examples/basic_alignment_spartan.rs
 //! Spartan version of the alignment circuit previously written
 //! in Arkworks. Similar, just a lot faster.
 //!

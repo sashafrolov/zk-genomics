@@ -1,6 +1,7 @@
 use crate::vanilla_tree::tree::{Leaf, MerkleTree, Path};
 use ff::{PrimeField, PrimeFieldBits};
 use neptune::Arity;
+use rayon::prelude::*;
 use std::marker::PhantomData;
 
 // M is top merkle tree size, N is bottom merkle tree size. H is the sum
@@ -32,12 +33,12 @@ pub struct SplitPath<
 }
 
 impl<
-        F: PrimeField + PrimeFieldBits,
+        F: PrimeField + PrimeFieldBits + Send + Sync,
         const M: usize,
         const N: usize,
         const H: usize,
-        AL: Arity<F>,
-        AN: Arity<F>,
+        AL: Arity<F> + Send + Sync,
+        AN: Arity<F> + Send + Sync,
     > SplitMerkleTree<F, M, N, H, AL, AN>
 {
     // New tree from vector of leaves. `empty_leaf_val` is the default value for leaf of empty tree.
@@ -45,8 +46,17 @@ impl<
         leaves: Vec<Leaf<F, AL>>,
         empty_leaf_val: Leaf<F, AL>,
     ) -> SplitMerkleTree<F, M, N, H, AL, AN> {
-        // assert!(M.is_power_of_two());
-        // assert!(N.is_power_of_two());
+        let unpadded_leaves_len = leaves.len();
+        assert!((1 << (H - 1) <= leaves.len()) && ((1 << H) >= leaves.len()));
+        let leaves = leaves
+            .into_iter()
+            .chain(
+                std::iter::repeat(empty_leaf_val.clone())
+                    .take((1usize << H).saturating_sub(unpadded_leaves_len)),
+            )
+            .take(1usize << H)
+            .collect::<Vec<_>>();
+
         assert_eq!(1 << H, leaves.len());
         assert_eq!(M + N, H);
 
@@ -59,8 +69,8 @@ impl<
             .collect();
 
         let bottom_merkle_tree_roots: Vec<_> = grouped_leaves
-            .iter()
-            .map(|group| {
+            .par_iter()
+            .map(|group: &Vec<Leaf<F, AL>>| {
                 let subtree: MerkleTree<F, N, AL, AN> =
                     MerkleTree::from_vec(group.clone(), empty_leaf_val.clone());
                 Leaf {

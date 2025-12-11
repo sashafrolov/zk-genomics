@@ -53,8 +53,6 @@ impl<
         leaves: Vec<F>,
         empty_leaf_val: Leaf<F, AL>,
     ) -> LargeLeafMerkleTree<F, LEAF_SIZE, HEIGHT, AL, AL2, AN> {
-        assert!((1 << HEIGHT) > LEAF_SIZE);
-
         let empty_leaf_felt = empty_leaf_val
             .val
             .get(0)
@@ -144,7 +142,7 @@ impl<
     // Returns the number of bytes used by the tree to store the hashes.
     // Note that this is additional bytes, the contents of the tree don't count.
     pub fn additional_storage_used(&self) -> usize {
-        const POSEIDON_HASH_SIZE : usize = 32;
+        const POSEIDON_HASH_SIZE: usize = 32;
         self.merkle_tree.additional_storage_used() + self.leaf_hashes.len() * POSEIDON_HASH_SIZE
     }
 }

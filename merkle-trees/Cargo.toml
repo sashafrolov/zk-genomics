@@ -12,8 +12,11 @@ ff = { version = "0.13", features = ["derive"] }
 num-bigint = "0.4.3"
 bellpepper-nonnative = { git = "https://github.com/avras/bellperson-nonnative.git" }
 neptune = "13.0.0"
+spartan2 = { path = "../Spartan2" }
+rand = "0.8.5"
+generic-array = "1.0.0"
+rayon = "1.10"
 
 [dev-dependencies]
-rand = "0.8.5"
 generic-array = "1.0.0"
 pasta_curves = "0.5.1"

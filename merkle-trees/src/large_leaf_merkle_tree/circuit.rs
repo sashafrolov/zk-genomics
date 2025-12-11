@@ -151,9 +151,7 @@ mod tests {
         const LEAF_SIZE: usize = 1 << 4;
         let leaves_len = (1 << HEIGHT) * LEAF_SIZE;
         let long_path_length = ((leaves_len) as f64).log2().ceil() as usize;
-        let random_leaves: Vec<Fp> = (0..leaves_len)
-            .map(|_| Fp::random(&mut rng))
-            .collect();
+        let random_leaves: Vec<Fp> = (0..leaves_len).map(|_| Fp::random(&mut rng)).collect();
         let mut cs = TestConstraintSystem::<Fp>::new();
         let mut tree: LargeLeafMerkleTree<Fp, LEAF_SIZE, HEIGHT, U1, U1, U2> =
             LargeLeafMerkleTree::from_vec(random_leaves.clone(), Leaf::default());
@@ -173,8 +171,10 @@ mod tests {
 
             // Allocating all variables
             let root_var: AllocatedNum<Fp> =
-                AllocatedNum::alloc_input(cs.namespace(|| format!("root {}", j)), || Ok(tree.merkle_tree.root))
-                    .unwrap();
+                AllocatedNum::alloc_input(cs.namespace(|| format!("root {}", j)), || {
+                    Ok(tree.merkle_tree.root)
+                })
+                .unwrap();
             let val_var: Vec<AllocatedNum<Fp>> = long_leaf
                 .clone()
                 .into_iter()
@@ -192,10 +192,7 @@ mod tests {
                 .into_iter()
                 .enumerate()
                 .map(|(i, s)| {
-                    AllocatedNum::alloc(
-                        cs.namespace(|| format!("{} : sibling {}", j, i)),
-                        || Ok(s),
-                    )
+                    AllocatedNum::alloc(cs.namespace(|| format!("{} : sibling {}", j, i)), || Ok(s))
                 })
                 .collect::<Result<Vec<AllocatedNum<Fp>>, SynthesisError>>()
                 .unwrap();

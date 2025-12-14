@@ -21,7 +21,7 @@ The Precision Lasso is a Lasso variant for variable selection when there are cor
 ## An Example Command:
 
 ```
-python runPL.py -t csv -n data/toy
+python3 runPL.py -t csv -n data/toy
 ```
 #### Data Support
 * Precision Lasso currently supports CSV and binary PLINK files. 

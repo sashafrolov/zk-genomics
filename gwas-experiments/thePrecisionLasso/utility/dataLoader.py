@@ -92,9 +92,9 @@ class FileReader():
                 Xname = ['geno ' + str(i+1) for i in range(X.shape[1])]
         if self.imputationFlag:
             X = self.imputation(X)
-            keep = True - np.isnan(y)
+            keep = ~np.isnan(y)
             return X[keep,:], y[keep], Xname
         else:
             X = self.simpleImputation(X)
-            keep = True - np.isnan(y)
+            keep = ~np.isnan(y)
             return X[keep,:], y[keep], Xname

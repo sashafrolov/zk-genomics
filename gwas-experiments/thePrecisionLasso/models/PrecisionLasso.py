@@ -1,6 +1,7 @@
 __author__ = 'Haohan Wang'
 
 import numpy as np
+import math
 from utility.cg import solve_cg, A_trace, norm, logisticRegressionGradientSolver
 
 class PrecisionLasso():
@@ -99,6 +100,33 @@ class PrecisionLasso():
             y = np.zeros_like(t)
             y[t>0.5] = 1
             return t
+
+    def predict_no_numpy(self, X):
+        """Predict without using numpy vectorized math."""
+        num_rows = X.shape[0]
+        num_features = self.w.shape[0] - 1
+        preds = []
+        for i in range(num_rows):
+            total = 0.0
+            for j in range(num_features):
+                total += float(X[i][j]) * float(self.w[j])
+            total += float(self.w[-1])  # bias term
+            if self.logistic:
+                prob = 1.0 / (1.0 + math.exp(-total))
+                preds.append(prob)
+            else:
+                preds.append(total)
+        return np.array(preds)
+
+    def compute_loss_no_numpy(self, X, y):
+        """Compute L2 loss between predictions and targets without vectorized math."""
+        preds = self.predict_no_numpy(X)
+        # y may be a list or numpy array; iterate elementwise
+        squared_error_sum = 0.0
+        for idx in range(len(y)):
+            diff = float(preds[idx]) - float(y[idx])
+            squared_error_sum += diff * diff
+        return math.sqrt(squared_error_sum)
 
     def setLambda(self, lmbd):
         self.lmbd = lmbd

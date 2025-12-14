@@ -1,27 +1,6 @@
 # Merkle Trees
-This repository contains implementation of the following Merkle Trees along with R1CS circuits implemented using [bellpepper](https://github.com/lurk-lab/bellpepper).
+This repository contains our implementations of modified Merkle Trees, which are part of our approach for verifying alignment in-circuit.
 
-1. **Vanilla Merkle Tree** - circuit to verify membership 
-2. **Indexed Merkle Tree** - circuit for insertion, checking membership and checking non-membership
+src/bin/long_leaf_benchmark.rs and src/bin/split_tree_benchmark.rs contain benchmarks for building a Merkle Tree over a full genome in plain computation, and the corresponding data structures are implemented in /src/. We also implement circuits for verifying membership in these merkle trees in files named `circuit.rs`.
 
-All the trees use Poseidon hash function implemented by [Neptune](https://github.com/lurk-lab/neptune).
-
-## References
-1. [Indexed Merkle Tree](https://docs.aztec.network/aztec/protocol/trees/indexed-merkle-tree)
-
-## License
-
-Licensed under either of
-
- * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
-
-## Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+We build upon Varun Thakore's implementation of Merkle Trees [here](https://github.com/varunthakore/merkle-trees/tree/master/src). All the trees use Poseidon hash function implemented by [Neptune](https://github.com/lurk-lab/neptune) and the `bellpepper` constraint library.

@@ -6,7 +6,7 @@
 import numpy as np
 
 def solve_cg(A, b, x, args, tol=10**(-8), k_max=None):
-    if k_max == None:
+    if k_max is None:
         k_max = x.shape[0]
     k = 0
     r = b - A(x, **args)
@@ -55,7 +55,7 @@ def logisticRegressionGradientSolver(w, X, y, D, lr, tol, maxIter, quiet=True):
     while resi_prev - resi > tol and step < maxIter:
         resi_prev = resi
         if not quiet:
-            print resi_prev
+            print(resi_prev)
 
         grad = logisticGradient(X, D, xi, diff)
         w = w - grad * lr

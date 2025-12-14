@@ -11,7 +11,7 @@ def printOutHead(): out.write("\t".join(["RANK", "SNP_ID", "BETA_ABS"]) + "\n")
 def outputResult(rank, id, beta):
     out.write("\t".join([str(x) for x in [rank, id, beta]]) + "\n")
 
-def KFold(X,y,k=5):
+def KFold(X, y, k=5):
     foldsize = int(X.shape[0]/k)
     for idx in range(k):
         testlst = range(idx*foldsize,idx*foldsize+foldsize)
@@ -93,12 +93,16 @@ if options.model == 'pl':
 if options.snum is None and options.lmbd is None:
     min_mse = np.inf
     min_lam = 0
+    test_size = None  # track size of held-out data in each fold
+    num_folds = 5
     for i in range(11):
         lam = 10**(i-5)
         model.setLambda(lam)
         model.setLearningRate(options.lr)
         mse = 0
-        for Xtrain, ytrain, Xtest, ytest in KFold(X, Y, 5):
+        for Xtrain, ytrain, Xtest, ytest in KFold(X, Y, num_folds):
+            if test_size is None:
+                test_size = ytest.shape[0]
             model.fit(Xtrain, ytrain)
             pred = model.predict(Xtest)
             mse += np.linalg.norm(pred - ytest)
@@ -153,6 +157,26 @@ for i in ind:
 beta_name = zip(beta, Xname)
 bn = sorted(beta_name)
 bn.reverse()
+
+if 'test_size' in locals() and test_size is not None:
+    print(
+        "Cross-validation folds:",
+        num_folds,
+        "Test set size each fold:",
+        test_size,
+        "Train set size each fold:",
+        X.shape[0] - test_size,
+    )
+    print("Final model is refit on all samples:", X.shape[0])
+
+non_zero_coeffs = [(name, coef) for coef, name in bn if coef != 0]
+print("Total coefficients: {}, non-zero: {}".format(len(beta), len(non_zero_coeffs)))
+if non_zero_coeffs:
+    print("Learned non-zero coefficients (feature, coefficient):")
+    for name, coef in non_zero_coeffs:
+        print("\t{}\t{}".format(name, coef))
+else:
+    print("All learned coefficients are zero.")
 
 out = open(outFile, 'w')
 printOutHead()

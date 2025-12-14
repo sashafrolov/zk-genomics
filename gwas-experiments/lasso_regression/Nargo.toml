@@ -1,0 +1,6 @@
+[package]
+name = "lasso_regression"
+type = "bin"
+authors = [""]
+
+[dependencies]

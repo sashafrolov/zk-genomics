@@ -38,6 +38,7 @@ bellpepper-core = "0.4.0"
 bellpepper = "0.4.0"
 ff = { version = "0.13.0", features = ["derive"] }
 spartan2 = { path = "../Spartan2" }
+bincode = "1"
 
 
 [features]

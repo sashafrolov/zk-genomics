@@ -1,4 +1,4 @@
-use crate::{Base, CigarChar};
+use crate::{Base, CigarChar, MSACigarChar};
 
 /// Computes an optimal global pairwise alignment between two DNA sequences using the
 /// Needleman-Wunsch algorithm and returns a CIGAR string representation of the alignment
@@ -121,8 +121,18 @@ pub fn basic_alignment(
 
         match direction {
             0 => {
-                // Diagonal: Match (covers both actual matches and mismatches)
-                cigar.push(CigarChar::Match);
+                // Diagonal move
+                let ref_idx = row_idx - 1;
+                let target_idx = col_idx - 1;
+                if reference_sequence[ref_idx] == target_sequence[target_idx] {
+                    // Actual match
+                    cigar.push(CigarChar::Match);
+                } else {
+                    // Mismatch: represent as Insert + Delete (substitution)
+                    // Order matters: Delete first, then Insert (when reversed, Insert comes before Delete)
+                    cigar.push(CigarChar::Insert);
+                    cigar.push(CigarChar::Delete);
+                }
                 row_idx -= 1;
                 col_idx -= 1;
             }
@@ -143,11 +153,15 @@ pub fn basic_alignment(
     // Reverse CIGAR string (we built it backwards)
     cigar.reverse();
 
-    // Get final alignment score
-    let final_score = scores[(num_rows * num_cols) - 1];
-    let final_score_usize = final_score.round();
+    // Recompute score from CIGAR string to match circuit's scoring
+    // (which counts +1 for each Insert and Delete, 0 for Match)
+    let final_score: f64 = cigar.iter().map(|c| match c {
+        CigarChar::Match => match_score,
+        CigarChar::Insert | CigarChar::Delete => gap_score,
+        CigarChar::Clip => 0.0,
+    }).sum();
 
-    (cigar, final_score_usize)
+    (cigar, final_score)
 }
 
 pub fn affine_gap_alignment(
@@ -160,10 +174,72 @@ pub fn affine_gap_alignment(
     todo!("Not yet implemented");
 }
 
-// Variants and how to deal with them:
-// Semiglobal/global: do the main body of the clipping outside of our alignment code.
-// Affine: do here
-// Multiple sequence alignment: not yet sure.
+/// Computes the sum-of-pairs alignment cost for a multiple sequence alignment.
+pub fn msa_pairwise_cost(
+    sequences: &[Vec<Base>],
+    cigars: &[Vec<MSACigarChar>],
+    mismatch_cost: f64,
+) -> f64 {
+    let num_sequences = sequences.len();
+    if num_sequences == 0 || cigars.is_empty() {
+        return 0.0;
+    }
+
+    // All CIGAR strings should have the same length (alignment length)
+    let alignment_length = cigars[0].len();
+    assert!(
+        cigars.iter().all(|c| c.len() == alignment_length),
+        "All CIGAR strings must have the same length"
+    );
+    if alignment_length == 0 {
+        return 0.0;
+    }
+    
+
+    let mut total_cost = 0.0;
+
+    // Track current position in each sequence's bases
+    let mut seq_positions: Vec<usize> = vec![0; num_sequences];
+
+    for pos in 0..alignment_length {
+        // Get base or gap for each sequence at this alignment position
+        let mut bases_at_pos: Vec<Option<Base>> = Vec::with_capacity(num_sequences);
+
+        for seq_idx in 0..num_sequences {
+            match cigars[seq_idx][pos] {
+                MSACigarChar::Match => {
+                    bases_at_pos.push(Some(sequences[seq_idx][seq_positions[seq_idx]]));
+                    seq_positions[seq_idx] += 1;
+                }
+                MSACigarChar::Gap => {
+                    bases_at_pos.push(None);
+                }
+            }
+        }
+
+        // Compute pairwise costs at this position
+        for i in 0..num_sequences {
+            for j in (i + 1)..num_sequences {
+                match (&bases_at_pos[i], &bases_at_pos[j]) {
+                    (Some(bi), Some(bj)) => {
+                        if bi != bj {
+                            total_cost += mismatch_cost;
+                        }
+                    }
+                    (Some(_), None) | (None, Some(_)) => {
+                        // Base vs gap mismatch
+                        total_cost += mismatch_cost;
+                    }
+                    (None, None) => {
+                        // Both gaps: no cost
+                    }
+                }
+            }
+        }
+    }
+
+    total_cost
+}
 
 #[cfg(test)]
 mod tests {
@@ -257,5 +333,78 @@ mod tests {
         // All deletes
         assert_eq!(cigar.len(), 3);
         assert!(cigar.iter().all(|&c| c == CigarChar::Delete));
+    }
+
+    #[test]
+    fn test_msa_pairwise_cost_perfect_match() {
+        // Two identical sequences, no gaps
+        let sequences = vec![
+            vec![Base::A, Base::C, Base::G],
+            vec![Base::A, Base::C, Base::G],
+        ];
+        // All matches for both sequences (alignment length = 3)
+        let cigars = vec![
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match], // seq 0
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match], // seq 1
+        ];
+
+        let cost = msa_pairwise_cost(&sequences, &cigars, 1.0);
+        assert_eq!(cost, 0.0); // No mismatches
+    }
+
+    #[test]
+    fn test_msa_pairwise_cost_with_mismatch() {
+        // Two sequences differing at position 1
+        let sequences = vec![
+            vec![Base::A, Base::C, Base::G],
+            vec![Base::A, Base::T, Base::G],
+        ];
+        let cigars = vec![
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match],
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match],
+        ];
+
+        let cost = msa_pairwise_cost(&sequences, &cigars, 1.0);
+        assert_eq!(cost, 1.0); // One mismatch at position 1
+    }
+
+    #[test]
+    fn test_msa_pairwise_cost_with_gap() {
+        // Seq 0: A-G (gap at position 1)
+        // Seq 1: ACG
+        let sequences = vec![
+            vec![Base::A, Base::G],       // Only non-gap bases
+            vec![Base::A, Base::C, Base::G],
+        ];
+        let cigars = vec![
+            vec![MSACigarChar::Match, MSACigarChar::Gap, MSACigarChar::Match],   // seq 0
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match], // seq 1
+        ];
+
+        let cost = msa_pairwise_cost(&sequences, &cigars, 1.0);
+        assert_eq!(cost, 1.0); // One gap mismatch at position 1
+    }
+
+    #[test]
+    fn test_msa_pairwise_cost_three_sequences() {
+        // Three sequences:
+        // Seq 0: ACG
+        // Seq 1: ATG (mismatch at pos 1)
+        // Seq 2: A-G (gap at pos 1)
+        let sequences = vec![
+            vec![Base::A, Base::C, Base::G],
+            vec![Base::A, Base::T, Base::G],
+            vec![Base::A, Base::G],
+        ];
+        let cigars = vec![
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match], // seq 0
+            vec![MSACigarChar::Match, MSACigarChar::Match, MSACigarChar::Match], // seq 1
+            vec![MSACigarChar::Match, MSACigarChar::Gap, MSACigarChar::Match],   // seq 2
+        ];
+
+        let cost = msa_pairwise_cost(&sequences, &cigars, 1.0);
+        // At position 1: C vs T (mismatch), C vs gap (mismatch), T vs gap (mismatch)
+        // Total: 3 mismatches
+        assert_eq!(cost, 3.0);
     }
 }

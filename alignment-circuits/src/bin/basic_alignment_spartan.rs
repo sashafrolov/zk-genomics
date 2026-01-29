@@ -34,6 +34,7 @@ use alignment_circuits::{Base, CigarChar, ToFeltBlocks};
 type E = T256HyraxEngine;
 
 const BASES_PER_BLOCK: usize = 125;
+// On my laptop, it looks like 1 << 9 is where memory maxes out, though proof times are still ~6 seconds, so a larger machine could go further.
 const SEQUENCE_BLOCK_LENGTH: usize = 1 << 4;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 // const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
@@ -135,7 +136,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        // This approach does embed the length of the cigar string into the circuit, with a little more work you could
+        // This does embed the length of the cigar string into the circuit, with a little more work you could
         // "pad" the CIGAR string to not leak this info.
         let cigar_string_input_vars = self
             .cigar_string_felts
@@ -205,19 +206,38 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 Some(self.target_sequence_felts[i]),
             )?;
             for j in 0..BASES_PER_BLOCK {
-                cs.enforce(
-                    || {
-                        format!(
-                            "Enforcing base decomposition for target sequence block {i} base {j}"
-                        )
-                    },
-                    |lc| lc + CS::one(),
-                    |lc| {
-                        lc + (TWO, block_as_bits[2 * j + 1].get_variable())
-                            + block_as_bits[2 * j].get_variable()
-                    },
-                    |lc| lc + target_sequence_base_vars[i * BASES_PER_BLOCK + j].get_variable(),
-                );
+                if i * BASES_PER_BLOCK + j < self.target_sequence_bases.len() {
+                    // Only enforce for valid bases (last block may be partial)
+                    cs.enforce(
+                        || {
+                            format!(
+                                "Enforcing base decomposition for target sequence block {i} base {j}"
+                            )
+                        },
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc + target_sequence_base_vars[i * BASES_PER_BLOCK + j].get_variable(),
+                    );
+                } else {
+                    // Ensure proper zero padding so this doesn't mess up the other constraint check.
+                    cs.enforce(
+                        || {
+                            format!(
+                                "Enforcing zero padding for target sequence block {i} position {j}"
+                            )
+                        },
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc, // zero
+                    );
+                }
+                
             }
             let mut pow_of_two = E::Scalar::ONE;
             let mut overall_decomposition_lc = LinearCombination::zero();
@@ -241,19 +261,37 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 Some(self.reference_sequence_felts[i]),
             )?;
             for j in 0..BASES_PER_BLOCK {
-                cs.enforce(
-                    || {
-                        format!(
-                            "Enforcing base decomposition for reference sequence block {i} base {j}"
-                        )
-                    },
-                    |lc| lc + CS::one(),
-                    |lc| {
-                        lc + (TWO, block_as_bits[2 * j + 1].get_variable())
-                            + block_as_bits[2 * j].get_variable()
-                    },
-                    |lc| lc + reference_sequence_base_vars[i * BASES_PER_BLOCK + j].get_variable(),
-                );
+                if i * BASES_PER_BLOCK + j < self.reference_sequence_bases.len() {
+                    // Only enforce for valid bases (last block may be partial)
+                    cs.enforce(
+                        || {
+                            format!(
+                                "Enforcing base decomposition for reference sequence block {i} base {j}"
+                            )
+                        },
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc + reference_sequence_base_vars[i * BASES_PER_BLOCK + j].get_variable(),
+                    );
+                } else {
+                    // Ensure proper zero padding so this doesn't mess up the other constraint check.
+                    cs.enforce(
+                        || {
+                            format!(
+                                "Enforcing zero padding for reference sequence block {i} position {j}"
+                            )
+                        },
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc, // zero
+                    );
+                }
             }
             let mut pow_of_two = E::Scalar::ONE;
             let mut overall_decomposition_lc = LinearCombination::zero();
@@ -277,15 +315,29 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 Some(self.cigar_string_felts[i]),
             )?;
             for j in 0..BASES_PER_BLOCK {
-                cs.enforce(
-                    || format!("Enforcing base decomposition for cigar string block {i} char {j}"),
-                    |lc| lc + CS::one(),
-                    |lc| {
-                        lc + (TWO, block_as_bits[2 * j + 1].get_variable())
-                            + block_as_bits[2 * j].get_variable()
-                    },
-                    |lc| lc + cigar_string_char_vars[i * BASES_PER_BLOCK + j].get_variable(),
-                );
+                if i * BASES_PER_BLOCK + j < self.cigar_string_chars.len() {
+                    // Only enforce for valid chars (last block may be partial)
+                    cs.enforce(
+                        || format!("Enforcing char decomposition for cigar string block {i} char {j}"),
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc + cigar_string_char_vars[i * BASES_PER_BLOCK + j].get_variable(),
+                    );
+                } else {
+                    // Ensure proper zero padding so this doesn't mess up the other constraint check.
+                    cs.enforce(
+                        || format!("Enforcing zero padding for cigar string block {i} position {j}"),
+                        |lc| lc + CS::one(),
+                        |lc| {
+                            lc + (TWO, block_as_bits[2 * j + 1].get_variable())
+                                + block_as_bits[2 * j].get_variable()
+                        },
+                        |lc| lc, // zero
+                    );
+                }
             }
             let mut pow_of_two = E::Scalar::ONE;
             let mut overall_decomposition_lc = LinearCombination::zero();
@@ -303,7 +355,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
             );
         }
 
-        // 3. Compute a hash for random challenges (will remove this part later in favor of random challenges.)
+        // 3. Compute a hash for random challenges (will remove this part later in favor of challenges directly from Spartan.)
         let (memcheck_challenge_0, memcheck_challenge_1) = {
             let default_poseidon_params =
                 Sponge::<<E as Engine>::Scalar, U2>::api_constants(Strength::Standard);
@@ -353,6 +405,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
         // 4. Verify alignment:
 
         // Initialize LHS of memcheck products
+        // TODO: Replace this with zk queue checking (this currently is faster than zk RAM but slightly worse than zk stack).
         let mut target_sequence_memcheck_product_left = AllocatedNum::alloc(
             cs.namespace(|| "Initial target sequence left memcheck product"),
             || Ok(E::Scalar::ONE),
@@ -441,6 +494,12 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
             AllocatedNum::alloc(cs.namespace(|| "Initial alignment score quantity"), || {
                 Ok(E::Scalar::ZERO)
             })?;
+        // For affine gap costs: tracks if the previous character was a non-gap (Match)
+        // Initialized to 1 since the "character before the first" is treated as non-gap
+        let mut is_last_character_non_gap =
+            AllocatedNum::alloc(cs.namespace(|| "Initial is_last_character_non_gap"), || {
+                Ok(E::Scalar::ONE)
+            })?;
         for (i, char) in cigar_string_char_vars.iter().enumerate() {
             // Booleans corresponding to each possible CIGAR string character
             let is_match = AllocatedNum::alloc(
@@ -512,7 +571,7 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 |_| LinearCombination::zero(),
             );
 
-            // Update scoring function (basic alignment scoring rn):
+            // Update scoring function (basic alignment):
             alignment_score = alignment_score.add(
                 cs.namespace(|| format!("Alignment char {i} score first addition")),
                 &is_insertion,
@@ -521,6 +580,28 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
                 cs.namespace(|| format!("Alignment char {i} score second addition")),
                 &is_deletion,
             )?;
+
+            // Update scoring function (affine gap costs):
+            // Gap opening (first gap after match) costs 2, gap extension costs 1
+            // Formula: is_last_character_non_gap * (is_insertion + is_deletion) + is_insertion + is_deletion
+            // let is_gap = is_insertion.add(
+            //     cs.namespace(|| format!("Affine gap {i}: is_gap computation")),
+            //     &is_deletion,
+            // )?;
+            // let gap_opening_cost = is_last_character_non_gap.mul(
+            //     cs.namespace(|| format!("Affine gap {i}: gap opening cost")),
+            //     &is_gap,
+            // )?;
+            // alignment_score = alignment_score.add(
+            //     cs.namespace(|| format!("Affine gap {i}: add gap opening cost")),
+            //     &gap_opening_cost,
+            // )?;
+            // alignment_score = alignment_score.add(
+            //     cs.namespace(|| format!("Affine gap {i}: add gap extension cost")),
+            //     &is_gap,
+            // )?;
+            // // Update is_last_character_non_gap for next iteration
+            // is_last_character_non_gap = is_match.clone();
 
             // Take as advice the values that we read from the sequence at various indices.
             let target_sequence_read_val = AllocatedNum::alloc(
@@ -757,7 +838,6 @@ impl<E: Engine> SpartanCircuit<E> for BasicAlignmentCircuit<E::Scalar> {
     }
 
     fn num_challenges(&self) -> usize {
-        // SHA-256 circuit does not expect any challenges
         0
     }
 
@@ -779,8 +859,29 @@ fn main() {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
+    // Test 1: both sequences totally match (used for benchmarking).
     let reference_sequence_bases = Base::random_sequence(SEQUENCE_BASE_PAIRS);
     let target_sequence_bases = reference_sequence_bases.clone();
+
+    // Test 2: The sequences differ in their first character.
+    // let reference_sequence_bases = Base::random_sequence(SEQUENCE_BASE_PAIRS);
+    // let mut target_sequence_bases = reference_sequence_bases.clone();
+    // // Make the first base different
+    // target_sequence_bases[0] = match reference_sequence_bases[0] {
+    //     Base::A => Base::C,
+    //     Base::C => Base::G,
+    //     Base::G => Base::T,
+    //     Base::T => Base::A,
+    // };
+
+    // Test 3: both 1 outright deletion.
+    // let reference_sequence_bases = Base::random_sequence(SEQUENCE_BASE_PAIRS);
+    // let target_sequence_bases = reference_sequence_bases[1..].to_vec();
+
+    // Test 4: Not multiple of 125 (this is a test case because this was previously a limitation):
+    // let reference_sequence_bases = Base::random_sequence(SEQUENCE_BASE_PAIRS-22);
+    // let target_sequence_bases = reference_sequence_bases.clone();
+
 
     let circuit = BasicAlignmentCircuit::<<E as Engine>::Scalar>::new(
         reference_sequence_bases,
@@ -819,10 +920,20 @@ fn main() {
     let verify_ms = t0.elapsed().as_millis();
     info!(elapsed_ms = verify_ms, "verify");
 
+    // Serialize proof to measure size (not timed)
+    let proof_bytes = bincode::serialize(&proof).expect("proof serialization failed");
+    let proof_size_bytes = proof_bytes.len();
+
+    // Compute public inputs size
+    let public_values = <BasicAlignmentCircuit<<E as Engine>::Scalar> as SpartanCircuit<E>>::public_values(&circuit).expect("public_values failed");
+    let public_values_bytes = bincode::serialize(&public_values).expect("public_values serialization failed");
+    let public_values_size_bytes = public_values_bytes.len();
+    let proof_without_public_inputs = proof_size_bytes - public_values_size_bytes;
+
     // Summary
     info!(
-        "SUMMARY cigar={} bases, setup={} ms, prep_prove={} ms, prove={} ms, verify={} ms",
-        cigar_len, setup_ms, prep_ms, prove_ms, verify_ms
+        "SUMMARY cigar={} chars, setup={} ms, prep_prove={} ms, prove={} ms, verify={} ms, proof_size={} bytes, public_inputs_size={} bytes, proof_excl_public={} bytes",
+        cigar_len, setup_ms, prep_ms, prove_ms, verify_ms, proof_size_bytes, public_values_size_bytes, proof_without_public_inputs
     );
     drop(root_span);
 }

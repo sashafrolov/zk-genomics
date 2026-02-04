@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import pathlib
+import random
 import sys
 import numpy as np
 import tomllib
@@ -104,6 +105,7 @@ def main():
     prover_inputs['y'] = y_fixed
     prover_inputs['beta'] = beta_fixed
     prover_inputs['regularization_constraint'] = regularization_constraint
+    prover_inputs['challenge'] = str(random.randint(0, 2**250 - 1))
 
     with config_path.open("wb") as f:
         f.write(tomli_w.dumps(prover_inputs).encode("utf-8"))

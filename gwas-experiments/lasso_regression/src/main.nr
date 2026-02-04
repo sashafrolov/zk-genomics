@@ -11,7 +11,7 @@ global FIXED_POINT_ZERO : Field = 2.pow_32((FIXED_POINT_PRECISION_BYTES * 8 + FI
 // beta is the set of claimed coefficients, which is public. (note that the bias term is the last rather than the first.)
 // regularization_constraint is the value that the L1 norm of beta must be less than.
 // All of these values must be in fixed point form of sufficient precision.
-fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: pub [Field; EVAL_SET_SIZE], beta: pub [Field; NUM_COEFFS], regularization_constraint: pub Field) -> pub (Field, Field) {    
+fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: [Field; EVAL_SET_SIZE], beta: pub [Field; NUM_COEFFS], regularization_constraint: pub Field, challenge: pub Field) -> pub (Field, Field, Field) {    
     let mut predictions = [0; EVAL_SET_SIZE];
     // Populate predictions
     for i in 0..EVAL_SET_SIZE {
@@ -59,8 +59,18 @@ fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: pub [Field; EVAL_SET_SIZE]
         prediction_avg_sum_of_square_differences = fixed_point_add(prediction_avg_sum_of_square_differences, squared_diff);
     }
 
+    let mut auth_hash = 0;
+    for i in 0..EVAL_SET_SIZE {
+        for j in 0..NUM_FEATURES {
+            auth_hash = auth_hash * challenge + X[i][j];
+        }
+    }
+    for i in 0..EVAL_SET_SIZE {
+        auth_hash = auth_hash * challenge + y[i];
+    }
+
     // Pulling a prio here, R^2 needs to be computed from these.
-    (l2_loss, prediction_avg_sum_of_square_differences)
+    (l2_loss, prediction_avg_sum_of_square_differences, auth_hash)
 }
 
 // Returns quotient and remainder of right shifting val by some amount.

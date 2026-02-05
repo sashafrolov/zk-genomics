@@ -1,0 +1,46 @@
+bb command: prove (mem: 7.80 MiB)
+Scheme is: ultra_honk, num threads: 24 (mem: 7.80 MiB)
+  --bytecode_path: target/merkle_tree_gen.json (mem: 7.80 MiB)
+  --witness_path: target/my_witness.gz (mem: 7.80 MiB)
+  --output_path: target (mem: 7.80 MiB)
+  --verbose: true (mem: 7.80 MiB)
+created circuit (mem: 190.61 MiB)
+Constructing ProverInstance (mem: 190.61 MiB)
+allocating polynomials object in prover instance... (mem: 190.61 MiB)
+populating trace... (mem: 300.57 MiB)
+time to construct proving key: 82 ms. (mem: 318.54 MiB)
+CircuitProve: Proving key computed in 293 ms (mem: 318.54 MiB)
+using cached bn254 crs with num points 8388608 at "/home/mauro/.bb-crs/bn254_g1.dat" (mem: 318.54 MiB)
+Initialized BN254 CRS from memory with num points = 262144 (mem: 332.39 MiB)
+vk hash in Oink prover: 0x060575ff51c4f143f05284c8b248977c8d3135eca35e984b30f17b3ad9d5402e (mem: 332.39 MiB)
+created oink proof (mem: 342.69 MiB)
+starting sumcheck rounds... (mem: 342.69 MiB)
+completed 18 rounds of sumcheck (mem: 382.09 MiB)
+executed multivariate-to-univariate reduction (mem: 386.09 MiB)
+computed opening proof (mem: 386.09 MiB)
+finished decider proving. (mem: 386.09 MiB)
+Public inputs saved to "target/public_inputs" (mem: 386.09 MiB)
+Proof saved to "target/proof" (mem: 386.09 MiB)
+	Command being timed: "bb prove -vb target/merkle_tree_gen.json -w target/my_witness.gz -o target"
+	User time (seconds): 12.37
+	System time (seconds): 1.39
+	Percent of CPU this job got: 877%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.56
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 395356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 25
+	Minor (reclaiming a frame) page faults: 57014
+	Voluntary context switches: 29489
+	Involuntary context switches: 82
+	Swaps: 0
+	File system inputs: 4744
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

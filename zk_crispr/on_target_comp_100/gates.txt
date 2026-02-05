@@ -1,0 +1,7 @@
+Scheme is: ultra_honk, num threads: 24 (mem: 7.70 MiB)
+{"functions": [
+  {
+        "acir_opcodes": 143579,
+        "circuit_size": 160804
+  }
+]}

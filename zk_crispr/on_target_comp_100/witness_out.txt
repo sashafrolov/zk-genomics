@@ -1,0 +1,116 @@
+warning: Unsafe block must have a safety comment above it
+   ┌─ src/off_target_mit.nr:37:29
+   │
+37 │ let (quotient, remainder) = unsafe { shr_hint::<N>(x) };
+   │                             ------ The comment must start with the "Safety: " word
+   │
+
+warning: Unsafe block must have a safety comment above it
+   ┌─ src/off_target_mit.nr:66:12
+   │
+66 │ let diff = unsafe { lt_hint(a, b) };
+   │            ------ The comment must start with the "Safety: " word
+   │
+
+warning: Unsafe block must have a safety comment above it
+   ┌─ src/off_target_mit.nr:88:33
+   │
+88 │     let (quotient, remainder) = unsafe { div_hint(numerator, divisor) };
+   │                                 ------ The comment must start with the "Safety: " word
+   │
+
+warning: unused variable position_feature_sc_u64
+    ┌─ src/on_target_ruleset_one.nr:350:9
+    │
+350 │     let position_feature_sc_u64 = position_feature_sc as u64;
+    │         ----------------------- unused variable
+    │
+
+warning: Unused expression result of type [Field; 4]
+    ┌─ src/on_target_ruleset_one.nr:389:5
+    │
+389 │     on_target_ruleset_one_score([0;30]);
+    │     -----------------------------------
+    │
+
+warning: unused variable pam_value
+    ┌─ src/off_target_mit.nr:179:9
+    │
+179 │     let pam_value = PAM_VALUES[pam_index];
+    │         --------- unused variable
+    │
+
+warning: unused import Poseidon2
+  ┌─ src/main.nr:2:26
+  │
+2 │ use poseidon::poseidon2::Poseidon2;
+  │                          --------- unused import
+  │
+
+warning: unused import blake2s
+  ┌─ src/main.nr:3:17
+  │
+3 │ use std::hash::{blake2s, pedersen_hash};
+  │                 ------- unused import
+  │
+
+warning: unused import pedersen_hash
+  ┌─ src/main.nr:3:26
+  │
+3 │ use std::hash::{blake2s, pedersen_hash};
+  │                          ------------- unused import
+  │
+
+warning: unused global STATE_SIZE
+  ┌─ src/membership.nr:9:8
+  │
+9 │ global STATE_SIZE: u32 = 5;
+  │        ---------- unused global
+  │
+
+warning: unused global RATE
+   ┌─ src/membership.nr:10:8
+   │
+10 │ global RATE: u32 = 4;        // Number of elements to absorb per permutation
+   │        ---- unused global
+   │
+
+warning: unused global CAPACITY
+   ┌─ src/membership.nr:11:8
+   │
+11 │ global CAPACITY: u32 = 1;    // Security parameter (128-bit security)
+   │        -------- unused global
+   │
+
+warning: unused global LOW_THRESHOLD
+   ┌─ src/off_target_mit.nr:16:8
+   │
+16 │ global LOW_THRESHOLD: u64 = 524288;
+   │        ------------- unused global
+   │
+
+warning: unused function print_value
+   ┌─ src/off_target_mit.nr:20:18
+   │
+20 │ unconstrained fn print_value(x:  Field) {
+   │                  ----------- unused function
+   │
+
+warning: unused function assert_lt
+   ┌─ src/off_target_mit.nr:64:4
+   │
+64 │ fn assert_lt<let BITS:u32>(a: Field, b: Field) {
+   │    --------- unused function
+   │
+
+warning: unused global SCALE
+  ┌─ src/on_target_ruleset_one.nr:4:8
+  │
+4 │ global SCALE:Field = 10000000; // 10^7
+  │        ----- unused global
+  │
+
+on_target_output Array: [0x00, 0x00, 0x00, 0x8c]
+[merkle_tree_gen] Circuit witness successfully solved
+[merkle_tree_gen] Witness saved to target/my_witness.gz
+[merkle_tree_gen] Circuit output: [0x00, 0x00, 0x00, 0x8c]

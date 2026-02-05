@@ -1,0 +1,46 @@
+bb command: prove (mem: 7.86 MiB)
+Scheme is: ultra_honk, num threads: 24 (mem: 7.86 MiB)
+  --bytecode_path: target/merkle_tree_gen.json (mem: 7.86 MiB)
+  --witness_path: target/my_witness.gz (mem: 7.86 MiB)
+  --output_path: target (mem: 7.86 MiB)
+  --verbose: true (mem: 7.86 MiB)
+created circuit (mem: 11.74 MiB)
+Constructing ProverInstance (mem: 11.74 MiB)
+allocating polynomials object in prover instance... (mem: 12.17 MiB)
+populating trace... (mem: 63.64 MiB)
+time to construct proving key: 26 ms. (mem: 64.58 MiB)
+CircuitProve: Proving key computed in 28 ms (mem: 64.58 MiB)
+using cached bn254 crs with num points 8388608 at "/home/mauro/.bb-crs/bn254_g1.dat" (mem: 64.58 MiB)
+Initialized BN254 CRS from memory with num points = 4096 (mem: 64.58 MiB)
+vk hash in Oink prover: 0x1ce7300c061b283d0bfc7350f45d56f3d9f90b45296e45daec406b3bb28cf367 (mem: 64.58 MiB)
+created oink proof (mem: 64.58 MiB)
+starting sumcheck rounds... (mem: 64.58 MiB)
+completed 12 rounds of sumcheck (mem: 66.22 MiB)
+executed multivariate-to-univariate reduction (mem: 66.37 MiB)
+computed opening proof (mem: 66.37 MiB)
+finished decider proving. (mem: 66.37 MiB)
+Public inputs saved to "target/public_inputs" (mem: 66.37 MiB)
+Proof saved to "target/proof" (mem: 66.37 MiB)
+	Command being timed: "bb prove -vb target/merkle_tree_gen.json -w target/my_witness.gz -o target"
+	User time (seconds): 0.92
+	System time (seconds): 0.46
+	Percent of CPU this job got: 310%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 68440
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 3573
+	Voluntary context switches: 22023
+	Involuntary context switches: 5
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -4,6 +4,7 @@ The subdirectories contain the code for different experiments run in the paper, 
 - `alignment-circuits` contains our demonstration code for implementing different types of alignment computations from Section N in the paper, as well as the combined end-to-end demo.
 - `gwas-experiments` contains our demonstration code for implementing regularized linear regression from Section N in the paper.
 - `merkle-trees` contains our code for implementing succinct data structures
+- `zk_crispr` contains our code for implementing models related to CRISPR.
 
 # Acknowledgements
 - `Spartan2` is a slightly modified version of Microsoft's [Spartan2](https://github.com/microsoft/Spartan2) repository.

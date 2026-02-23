@@ -46,7 +46,7 @@ fn main() {
     const NUM_LEAVES: usize = FIELD_ELEMENTS_IN_GENOME;
     const TOTAL_MERKLE_TREE_HEIGHT: usize = ceil_log2(NUM_LEAVES);
 
-    const TOP_TREE_HEIGHT: usize = 18;
+    const TOP_TREE_HEIGHT: usize = 23; 
     const BOTTOM_TREE_HEIGHT: usize = TOTAL_MERKLE_TREE_HEIGHT - TOP_TREE_HEIGHT;
 
     let empty_leaf_val = Leaf::default();

@@ -3,6 +3,7 @@ use ff::{PrimeField, PrimeFieldBits};
 use neptune::Arity;
 use rayon::prelude::*;
 use std::marker::PhantomData;
+use std::time::Instant;
 
 // M is top merkle tree size, N is bottom merkle tree size. H is the sum
 // of M+N, because you can't do math in Rust generics like in C++.
@@ -100,8 +101,14 @@ impl<
         let bottom_tree_leaves = self.grouped_leaves[bottom_tree_idx].clone();
 
         let top_tree_path = self.top_merkle_tree.get_siblings_path(top_tree_bits);
+
+        println!("[DEBUG] Bottom tree leaves: {}, height N={}", bottom_tree_leaves.len(), N);
+        let bottom_tree_start = Instant::now();
         let bottom_tree =
             MerkleTree::<F, N, AL, AN>::from_vec(bottom_tree_leaves, Leaf::<F, AL>::default());
+        let bottom_tree_build_time = bottom_tree_start.elapsed();
+        println!("[DEBUG] Bottom tree construction: {:?}", bottom_tree_build_time);
+
         let bottom_tree_path = bottom_tree.get_siblings_path(bottom_tree_bits);
 
         SplitPath {

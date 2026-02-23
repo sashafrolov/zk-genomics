@@ -88,7 +88,7 @@ def main():
 
     print(f"Dataset: {eval_set_size} samples, {num_features} features")
     print(f"Best alpha (regularization): {model.alpha_:.6f}")
-    print(f"R² score: {r2_score:.6f}")
+    print(f"R Squared score: {r2_score:.6f}")
     print(f"L2 loss (SSE): {l2_loss:.6f}")
     print(f"L1 norm of coefficients: {l1_norm:.6f}")
     print(f"Non-zero coefficients: {n_nonzero} / {num_features}")

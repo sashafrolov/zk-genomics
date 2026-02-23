@@ -1,5 +1,5 @@
-global EVAL_SET_SIZE: u32 = 100;
-global NUM_FEATURES: u32 = 999; // This is not sparse, may change later.
+global EVAL_SET_SIZE: u32 = 867;
+global NUM_FEATURES: u32 = 1000; // This is not sparse, may change later.
 global NUM_COEFFS: u32 = NUM_FEATURES + 1; // There is an additional bias term.
 global FIXED_POINT_PRECISION_BYTES: u32 = 4; 
 global FIXED_POINT_MAX_MAGNITUDE_BYTES: u32 = 4; // Implicit precision assumption that these two precisions add to less than 15, since u128's are used in here.
@@ -69,6 +69,7 @@ fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: [Field; EVAL_SET_SIZE], be
         auth_hash = auth_hash * challenge + y[i];
     }
 
+    println(auth_hash);
     // Pulling a prio here, R^2 needs to be computed from these.
     (l2_loss, prediction_avg_sum_of_square_differences, auth_hash)
 }

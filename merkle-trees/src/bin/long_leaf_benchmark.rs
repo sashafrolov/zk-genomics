@@ -39,7 +39,7 @@ fn main() {
         .collect();
 
     // let log_leaf_sizes: Vec<usize> = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-    const LEAF_SIZE: usize = 1 << 15;
+    const LEAF_SIZE: usize = 1 << 1;
 
     const NUM_LEAVES: usize = (FIELD_ELEMENTS_IN_GENOME + LEAF_SIZE - 1) / LEAF_SIZE;
     const HEIGHT: usize = ceil_log2(NUM_LEAVES);
@@ -50,22 +50,39 @@ fn main() {
         LargeLeafMerkleTree::from_vec(leaves.clone(), empty_leaf_val.clone());
     let build_time = build_start.elapsed();
 
-    let idx_raw: u64 = rng.gen_range(0..FIELD_ELEMENTS_IN_GENOME as u64);
+    const NUM_PROOF_SAMPLES: usize = 100;
     let idx_bits_len: usize = ((LEAF_SIZE * (1 << HEIGHT)) as f64).log2().ceil() as usize;
-    let idx_bits = idx_to_bits(idx_bits_len, <E as Engine>::Scalar::from(idx_raw));
-    let leaf = leaves[idx_raw as usize];
 
-    let proof_start = Instant::now();
-    let proof = tree.get_siblings_path(idx_bits.clone());
-    let proof_time = proof_start.elapsed();
+    // Generate 100 random indices and measure proof generation time for each
+    let mut total_proof_time = std::time::Duration::ZERO;
+    let mut last_proof = None;
+    let mut last_idx_bits = None;
+    let mut last_leaf = None;
 
+    for _ in 0..NUM_PROOF_SAMPLES {
+        let idx_raw: u64 = rng.gen_range(0..FIELD_ELEMENTS_IN_GENOME as u64);
+        let idx_bits = idx_to_bits(idx_bits_len, <E as Engine>::Scalar::from(idx_raw));
+        let leaf = leaves[idx_raw as usize];
+
+        let proof_start = Instant::now();
+        let proof = tree.get_siblings_path(idx_bits.clone());
+        total_proof_time += proof_start.elapsed();
+
+        last_proof = Some(proof);
+        last_idx_bits = Some(idx_bits);
+        last_leaf = Some(leaf);
+    }
+
+    let avg_proof_time = total_proof_time / NUM_PROOF_SAMPLES as u32;
+
+    // Verify the last proof to ensure correctness
     let verify_start = Instant::now();
-    let is_valid = tree.verify(idx_bits.clone(), leaf, &proof);
+    let is_valid = tree.verify(last_idx_bits.clone().unwrap(), last_leaf.unwrap(), &last_proof.unwrap());
     let verify_time = verify_start.elapsed();
 
     println!("Tree height:  {:?}, (leaf size: {:?})", HEIGHT, LEAF_SIZE);
     println!("Tree additional size: {:?}B", tree.additional_storage_used());
     println!("Tree build:   {:?}", build_time);
-    println!("Proof gen:    {:?}", proof_time);
+    println!("Proof gen:    {:?} (avg over {} samples)", avg_proof_time, NUM_PROOF_SAMPLES);
     println!("Proof verify: {:?} (valid = {})", verify_time, is_valid);
 }

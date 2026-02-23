@@ -16,6 +16,17 @@ spartan2 = { path = "../Spartan2" }
 rand = "0.8.5"
 generic-array = "1.0.0"
 rayon = "1.10"
+rs_merkle = "1.4"
+sha2 = "0.10"
+
+# Plonky3 dependencies for BabyBear + Poseidon2 Merkle tree
+p3-baby-bear = "0.4.2"
+p3-commit = "0.4.2"
+p3-field = "0.4.2"
+p3-matrix = "0.4.2"
+p3-merkle-tree = "0.4.2"
+p3-poseidon2 = "0.4.2"
+p3-symmetric = "0.4.2"
 
 [dev-dependencies]
 generic-array = "1.0.0"

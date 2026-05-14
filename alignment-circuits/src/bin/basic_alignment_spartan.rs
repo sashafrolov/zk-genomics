@@ -35,7 +35,7 @@ type E = T256HyraxEngine;
 
 const BASES_PER_BLOCK: usize = 125;
 // On my laptop, it looks like 1 << 9 is where memory maxes out, though proof times are still ~6 seconds, so a larger machine could go further.
-const SEQUENCE_BLOCK_LENGTH: usize = 1 << 6;
+const SEQUENCE_BLOCK_LENGTH: usize = 1 << 8;
 const SEQUENCE_BASE_PAIRS: usize = SEQUENCE_BLOCK_LENGTH * BASES_PER_BLOCK;
 // const CIGAR_STRING_LENGTH: usize = SEQUENCE_BASE_PAIRS;
 // const CIGAR_STRING_LENGTH_BLOCKS: usize = SEQUENCE_BASE_PAIRS.div_ceil(BASES_PER_BLOCK);

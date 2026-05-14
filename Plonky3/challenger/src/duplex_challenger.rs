@@ -1,0 +1,785 @@
+use alloc::vec;
+use alloc::vec::Vec;
+use core::error::Error;
+use core::fmt::{Display, Formatter};
+
+use p3_field::{BasedVectorSpace, Field, PrimeField64};
+use p3_monty_31::{MontyField31, MontyParameters};
+use p3_symmetric::{CryptographicPermutation, Hash};
+
+use crate::{CanObserve, CanSample, CanSampleBits, CanSampleUniformBits, FieldChallenger};
+
+/// A generic duplex sponge challenger over a finite field, used for generating deterministic
+/// challenges from absorbed inputs.
+///
+/// This structure implements a duplex sponge that alternates between:
+/// - Absorbing inputs into the sponge state,
+/// - Applying a cryptographic permutation over the state,
+/// - Squeezing outputs from the state as challenges.
+///
+/// The sponge operates over a state of `WIDTH` elements, divided into:
+/// - A rate of `RATE` elements (the portion exposed to input/output),
+/// - A capacity of `WIDTH - RATE` elements (the hidden part ensuring security).
+///
+/// The challenger buffers observed inputs until the rate is full, applies the permutation,
+/// and then produces challenge outputs from the permuted state. It supports:
+/// - Observing single values, arrays, hashes, or nested vectors,
+/// - Sampling fresh challenges as field elements or bitstrings.
+#[derive(Clone, Debug)]
+pub struct DuplexChallenger<F, P, const WIDTH: usize, const RATE: usize>
+where
+    F: Clone,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    /// The internal sponge state, consisting of `WIDTH` field elements.
+    ///
+    /// The first `RATE` elements form the rate section, where input values are absorbed
+    /// and output values are squeezed.
+    /// The remaining `WIDTH - RATE` elements form the capacity, which provides hidden
+    /// entropy and security against attacks.
+    pub sponge_state: [F; WIDTH],
+
+    /// A buffer holding field elements that have been observed but not yet absorbed.
+    ///
+    /// Inputs added via `observe` are collected here.
+    /// Once the buffer reaches `RATE` elements, the sponge performs a duplexing step:
+    /// it absorbs the inputs into the state and applies the permutation.
+    pub input_buffer: Vec<F>,
+
+    /// A buffer holding field elements that have been squeezed from the sponge state.
+    ///
+    /// Outputs are produced by `duplexing` and stored here.
+    /// Calls to `sample` or `sample_bits` pop values from this buffer.
+    /// When the buffer is empty (or new inputs were absorbed), a new duplexing step is triggered.
+    pub output_buffer: Vec<F>,
+
+    /// The cryptographic permutation applied to the sponge state.
+    ///
+    /// This permutation must provide strong pseudorandomness and collision resistance,
+    /// ensuring that squeezed outputs are indistinguishable from random and securely
+    /// bound to the absorbed inputs.
+    pub permutation: P,
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Copy,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    pub fn new(permutation: P) -> Self
+    where
+        F: Default,
+    {
+        Self {
+            sponge_state: [F::default(); WIDTH],
+            input_buffer: vec![],
+            output_buffer: vec![],
+            permutation,
+        }
+    }
+
+    fn duplexing(&mut self) {
+        assert!(self.input_buffer.len() <= RATE);
+
+        // Overwrite the first r elements with the inputs.
+        for (i, val) in self.input_buffer.drain(..).enumerate() {
+            self.sponge_state[i] = val;
+        }
+
+        // Apply the permutation.
+        self.permutation.permute_mut(&mut self.sponge_state);
+
+        self.output_buffer.clear();
+        self.output_buffer.extend(&self.sponge_state[..RATE]);
+    }
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> FieldChallenger<F>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: PrimeField64,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> CanObserve<F>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Copy,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn observe(&mut self, value: F) {
+        // Any buffered output is now invalid.
+        self.output_buffer.clear();
+
+        self.input_buffer.push(value);
+
+        if self.input_buffer.len() == RATE {
+            self.duplexing();
+        }
+    }
+}
+
+impl<F, P, const N: usize, const WIDTH: usize, const RATE: usize> CanObserve<[F; N]>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Copy,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn observe(&mut self, values: [F; N]) {
+        for value in values {
+            self.observe(value);
+        }
+    }
+}
+
+impl<F, P, const N: usize, const WIDTH: usize, const RATE: usize> CanObserve<Hash<F, F, N>>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Copy,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn observe(&mut self, values: Hash<F, F, N>) {
+        for value in values {
+            self.observe(value);
+        }
+    }
+}
+
+// for TrivialPcs
+impl<F, P, const WIDTH: usize, const RATE: usize> CanObserve<Vec<Vec<F>>>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Copy,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn observe(&mut self, valuess: Vec<Vec<F>>) {
+        for values in valuess {
+            for value in values {
+                self.observe(value);
+            }
+        }
+    }
+}
+
+impl<F, EF, P, const WIDTH: usize, const RATE: usize> CanSample<EF>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: Field,
+    EF: BasedVectorSpace<F>,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn sample(&mut self) -> EF {
+        EF::from_basis_coefficients_fn(|_| {
+            // If we have buffered inputs, we must perform a duplexing so that the challenge will
+            // reflect them. Or if we've run out of outputs, we must perform a duplexing to get more.
+            if !self.input_buffer.is_empty() || self.output_buffer.is_empty() {
+                self.duplexing();
+            }
+
+            self.output_buffer
+                .pop()
+                .expect("Output buffer should be non-empty")
+        })
+    }
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> CanSampleBits<usize>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: PrimeField64,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    /// The sampled bits are not perfectly uniform, but we can bound the error: every sequence
+    /// appears with probability 1/p-close to uniform (1/2^b).
+    ///
+    /// Proof:
+    /// We denote p = F::ORDER_U64, and b = `bits`.
+    /// If X follows a uniform distribution over F, if we consider the first b bits of X, each
+    /// sequence appears either with probability P1 = ⌊p / 2^b⌋ / p or P2 = (1 + ⌊p / 2^b⌋) / p.
+    /// We have 1/2^b - 1/p ≤ P1, P2 ≤ 1/2^b + 1/p
+    fn sample_bits(&mut self, bits: usize) -> usize {
+        assert!(bits < (usize::BITS as usize));
+        assert!((1 << bits) < F::ORDER_U64);
+        let rand_f: F = self.sample();
+        let rand_usize = rand_f.as_canonical_u64() as usize;
+        rand_usize & ((1 << bits) - 1)
+    }
+}
+
+/// Trait for fields that support uniform bit sampling optimizations
+pub trait UniformSamplingField {
+    /// Maximum number of bits we can sample at negligible (~1/field prime) probability of
+    /// triggering an error / requiring a resample.
+    const MAX_SINGLE_SAMPLE_BITS: usize;
+    /// An array storing the largest value `m_k` for each `k` in [0, 31], such that `m_k`
+    /// is a multiple of `2^k` and less than P. `m_k` is defined as:
+    ///
+    /// \( m_k = ⌊P / 2^k⌋ · 2^k \)
+    ///
+    /// This is used as a rejection sampling threshold (or error trigger), when sampling
+    /// random bits from uniformly sampled field elements. As long as we sample up to the `k`
+    /// least significant bits in the range [0, m_k), we sample from exactly `m_k` elements. As
+    /// `m_k` is divisible by 2^k, each of the least significant `k` bits has exactly the same
+    /// number of zeroes and ones, leading to a uniform sampling.
+    const SAMPLING_BITS_M: [u64; 64];
+}
+
+// Provide a blanket implementation for Monty31 fields here, which forwards the
+// implementation of the variables to the generic argument `<Field>Parameter`,
+// for which we implement the trait (KoalaBear, BabyBear).
+impl<MP> UniformSamplingField for MontyField31<MP>
+where
+    MP: UniformSamplingField + MontyParameters,
+{
+    const MAX_SINGLE_SAMPLE_BITS: usize = MP::MAX_SINGLE_SAMPLE_BITS;
+    const SAMPLING_BITS_M: [u64; 64] = MP::SAMPLING_BITS_M;
+}
+
+// Set of different strategies we currently support for sampling
+// Implementations for each are below.
+/// A zero-sized struct representing the "resample" strategy.
+pub(super) struct ResampleOnRejection;
+/// A zero-sized struct representing the "error" strategy.
+pub(super) struct ErrorOnRejection;
+
+/// Custom error raised when resampling is required for uniform bits but disabled
+/// via `ErrorOnRejection` strategy.
+#[derive(Debug)]
+pub struct ResamplingError {
+    /// The sampled value
+    value: u64,
+    /// The target value we need to be smaller than
+    m: u64,
+}
+
+impl Display for ResamplingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Encountered value {0}, which requires resampling for uniform bits as it not smaller than {1}. But resampling is not enabled.",
+            self.value, self.m
+        )
+    }
+}
+
+impl Error for ResamplingError {}
+
+/// A trait that defines a strategy for handling out-of-range samples.
+pub(super) trait BitSamplingStrategy<F, P, const W: usize, const R: usize>
+where
+    F: PrimeField64,
+    P: CryptographicPermutation<[F; W]>,
+{
+    /// Whether to error instead of resampling when a drawn value is too large.
+    const ERROR_ON_REJECTION: bool;
+
+    #[inline]
+    fn sample_value(
+        challenger: &mut DuplexChallenger<F, P, W, R>,
+        m: u64,
+    ) -> Result<F, ResamplingError> {
+        let mut result: F = challenger.sample();
+        if Self::ERROR_ON_REJECTION {
+            if result.as_canonical_u64() >= m {
+                return Err(ResamplingError {
+                    value: result.as_canonical_u64(),
+                    m,
+                });
+            }
+        } else {
+            while result.as_canonical_u64() >= m {
+                result = challenger.sample();
+            }
+        }
+        Ok(result)
+    }
+}
+
+/// Implement rejection sampling
+impl<F, P, const W: usize, const R: usize> BitSamplingStrategy<F, P, W, R> for ResampleOnRejection
+where
+    F: PrimeField64,
+    P: CryptographicPermutation<[F; W]>,
+{
+    const ERROR_ON_REJECTION: bool = false;
+}
+
+/// Implement erroring on a required rejection
+impl<F, P, const W: usize, const R: usize> BitSamplingStrategy<F, P, W, R> for ErrorOnRejection
+where
+    F: PrimeField64,
+    P: CryptographicPermutation<[F; W]>,
+{
+    const ERROR_ON_REJECTION: bool = true;
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: UniformSamplingField + PrimeField64,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    /// Generic implementation for uniform bit sampling, parameterized by a strategy.
+    #[inline]
+    fn sample_uniform_bits_with_strategy<S>(
+        &mut self,
+        bits: usize,
+    ) -> Result<usize, ResamplingError>
+    where
+        S: BitSamplingStrategy<F, P, WIDTH, RATE>,
+    {
+        if bits == 0 {
+            return Ok(0);
+        };
+        assert!(bits < usize::BITS as usize, "bit count must be valid");
+        assert!(
+            (1u64 << bits) < F::ORDER_U64,
+            "bit count exceeds field order"
+        );
+        let m = F::SAMPLING_BITS_M[bits];
+        if bits <= F::MAX_SINGLE_SAMPLE_BITS {
+            // Fast path: Only one sample is needed for sufficient uniformity.
+            let rand_f = S::sample_value(self, m);
+            Ok(rand_f?.as_canonical_u64() as usize & ((1 << bits) - 1))
+        } else {
+            // Slow path: Sample twice to construct the required number of bits.
+            // This reduces the bias introduced by a single, larger sample.
+            let half_bits1 = bits / 2;
+            let half_bits2 = bits - half_bits1;
+            // Sample the first chunk of bits.
+            let rand1 = S::sample_value(self, F::SAMPLING_BITS_M[half_bits1]);
+            let chunk1 = rand1?.as_canonical_u64() as usize & ((1 << half_bits1) - 1);
+            // Sample the second chunk of bits.
+            let rand2 = S::sample_value(self, F::SAMPLING_BITS_M[half_bits2]);
+            let chunk2 = rand2?.as_canonical_u64() as usize & ((1 << half_bits2) - 1);
+
+            // Combine the chunks.
+            Ok(chunk1 | (chunk2 << half_bits1))
+        }
+    }
+}
+
+impl<F, P, const WIDTH: usize, const RATE: usize> CanSampleUniformBits<F>
+    for DuplexChallenger<F, P, WIDTH, RATE>
+where
+    F: UniformSamplingField + PrimeField64,
+    P: CryptographicPermutation<[F; WIDTH]>,
+{
+    fn sample_uniform_bits<const RESAMPLE: bool>(
+        &mut self,
+        bits: usize,
+    ) -> Result<usize, ResamplingError> {
+        if RESAMPLE {
+            self.sample_uniform_bits_with_strategy::<ResampleOnRejection>(bits)
+        } else {
+            self.sample_uniform_bits_with_strategy::<ErrorOnRejection>(bits)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::iter;
+
+    use p3_baby_bear::BabyBear;
+    use p3_field::PrimeCharacteristicRing;
+    use p3_field::extension::BinomialExtensionField;
+    use p3_goldilocks::Goldilocks;
+    use p3_symmetric::Permutation;
+
+    use super::*;
+    use crate::grinding_challenger::GrindingChallenger;
+
+    const WIDTH: usize = 24;
+    const RATE: usize = 16;
+
+    type G = Goldilocks;
+    type EF2G = BinomialExtensionField<G, 2>;
+
+    type BB = BabyBear;
+
+    #[derive(Clone)]
+    struct TestPermutation {}
+
+    impl<F: Clone> Permutation<[F; WIDTH]> for TestPermutation {
+        fn permute_mut(&self, input: &mut [F; WIDTH]) {
+            input.reverse();
+        }
+    }
+
+    impl<F: Clone> CryptographicPermutation<[F; WIDTH]> for TestPermutation {}
+
+    #[test]
+    fn test_duplex_challenger() {
+        type Chal = DuplexChallenger<G, TestPermutation, WIDTH, RATE>;
+        let permutation = TestPermutation {};
+        let mut duplex_challenger = DuplexChallenger::new(permutation);
+
+        // Observe 12 elements.
+        (0..12).for_each(|element| duplex_challenger.observe(G::from_u8(element as u8)));
+
+        let state_after_duplexing: Vec<_> = iter::repeat_n(G::ZERO, 12)
+            .chain((0..12).map(G::from_u8).rev())
+            .collect();
+
+        let expected_samples: Vec<G> = state_after_duplexing[..16].iter().copied().rev().collect();
+        let samples = <Chal as CanSample<G>>::sample_vec(&mut duplex_challenger, 16);
+        assert_eq!(samples, expected_samples);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_duplex_challenger_sample_bits_security() {
+        type GoldilocksChal = DuplexChallenger<G, TestPermutation, WIDTH, RATE>;
+        let permutation = TestPermutation {};
+        let mut duplex_challenger = GoldilocksChal::new(permutation);
+
+        for _ in 0..100 {
+            assert!(duplex_challenger.sample_bits(129) < 4);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_duplex_challenger_sample_bits_security_small_field() {
+        type BabyBearChal = DuplexChallenger<BB, TestPermutation, WIDTH, RATE>;
+        let permutation = TestPermutation {};
+        let mut duplex_challenger = BabyBearChal::new(permutation);
+
+        for _ in 0..100 {
+            assert!(duplex_challenger.sample_bits(40) < 1 << 31);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_duplex_challenger_grind_security() {
+        type GoldilocksChal = DuplexChallenger<G, TestPermutation, WIDTH, RATE>;
+        let permutation = TestPermutation {};
+        let mut duplex_challenger = GoldilocksChal::new(permutation);
+
+        // This should cause sample_bits (and hence grind and check_witness) to
+        // panic. If bit sizes were not constrained correctly inside the
+        // challenger, (1 << too_many_bits) would loop around, incorrectly
+        // grinding and accepting a 1-bit PoW.
+        let too_many_bits = usize::BITS as usize;
+
+        let witness = duplex_challenger.grind(too_many_bits);
+        assert!(duplex_challenger.check_witness(too_many_bits, witness));
+    }
+
+    #[test]
+    fn test_observe_single_value() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        chal.observe(G::from_u8(42));
+        assert_eq!(chal.input_buffer, vec![G::from_u8(42)]);
+        assert!(chal.output_buffer.is_empty());
+    }
+
+    #[test]
+    fn test_observe_array_of_values() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        chal.observe([G::from_u8(1), G::from_u8(2), G::from_u8(3)]);
+        assert_eq!(
+            chal.input_buffer,
+            vec![G::from_u8(1), G::from_u8(2), G::from_u8(3)]
+        );
+        assert!(chal.output_buffer.is_empty());
+    }
+
+    #[test]
+    fn test_observe_hash_array() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        let hash = Hash::<G, G, 4>::from([G::from_u8(10); 4]);
+        chal.observe(hash);
+        assert_eq!(chal.input_buffer, vec![G::from_u8(10); 4]);
+    }
+
+    #[test]
+    fn test_observe_nested_vecs() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        chal.observe(vec![
+            vec![G::from_u8(1), G::from_u8(2)],
+            vec![G::from_u8(3)],
+        ]);
+        assert_eq!(
+            chal.input_buffer,
+            vec![G::from_u8(1), G::from_u8(2), G::from_u8(3)]
+        );
+    }
+
+    #[test]
+    fn test_sample_triggers_duplex() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        chal.observe(G::from_u8(5));
+        assert!(chal.output_buffer.is_empty());
+        let _sample: G = chal.sample();
+        assert!(!chal.output_buffer.is_empty());
+    }
+
+    #[test]
+    fn test_sample_multiple_extension_field() {
+        use p3_field::extension::BinomialExtensionField;
+        type EF = BinomialExtensionField<G, 2>;
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        chal.observe(G::from_u8(1));
+        chal.observe(G::from_u8(2));
+        let _: EF = chal.sample();
+        let _: EF = chal.sample();
+    }
+
+    #[test]
+    fn test_sample_bits_within_bounds() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        for i in 0..RATE {
+            chal.observe(G::from_u8(i as u8));
+        }
+
+        // With RATE=16 and input = 0..15, the reversed sponge_state will be 15..0
+        // The first RATE elements of that, i.e. output_buffer, are 15..0
+        // sample_bits(3) will sample the last of those: G::from_u8(0)
+
+        let bits = 3;
+        let value = chal.sample_bits(bits);
+        let expected = G::ZERO.as_canonical_u64() as usize & ((1 << bits) - 1);
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_sample_bits_trigger_duplex_when_empty() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        // Force empty buffers
+        assert_eq!(chal.input_buffer.len(), 0);
+        assert_eq!(chal.output_buffer.len(), 0);
+
+        // sampling bits should not panic, should return 0
+        let bits = 2;
+        let sample = chal.sample_bits(bits);
+        let expected = G::ZERO.as_canonical_u64() as usize & ((1 << bits) - 1);
+        assert_eq!(sample, expected);
+    }
+
+    #[test]
+    fn test_output_buffer_pops_correctly() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // Observe RATE elements, causing a duplexing
+        for i in 0..RATE {
+            chal.observe(G::from_u8(i as u8));
+        }
+
+        // we expect the output buffer to be reversed
+        let expected = [
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(15),
+            G::from_u8(14),
+            G::from_u8(13),
+            G::from_u8(12),
+            G::from_u8(11),
+            G::from_u8(10),
+            G::from_u8(9),
+            G::from_u8(8),
+        ]
+        .to_vec();
+
+        assert_eq!(chal.output_buffer, expected);
+
+        let first: G = chal.sample();
+        let second: G = chal.sample();
+
+        // sampling pops from end of output buffer
+        assert_eq!(first, G::from_u8(8));
+        assert_eq!(second, G::from_u8(9));
+    }
+
+    #[test]
+    fn test_duplexing_only_when_needed() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        chal.output_buffer = vec![G::from_u8(10), G::from_u8(20)];
+
+        // Sample should not call duplexing; just pop from the buffer
+        let sample: G = chal.sample();
+        assert_eq!(sample, G::from_u8(20));
+        assert_eq!(chal.output_buffer, vec![G::from_u8(10)]);
+    }
+
+    #[test]
+    fn test_flush_when_input_full() {
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // Observe RATE elements, causing a duplexing
+        for i in 0..RATE {
+            chal.observe(G::from_u8(i as u8));
+        }
+
+        // We expect the output buffer to be reversed
+        let expected_output = [
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(0),
+            G::from_u8(15),
+            G::from_u8(14),
+            G::from_u8(13),
+            G::from_u8(12),
+            G::from_u8(11),
+            G::from_u8(10),
+            G::from_u8(9),
+            G::from_u8(8),
+        ]
+        .to_vec();
+
+        // Input buffer should be drained after duplexing
+        assert!(chal.input_buffer.is_empty());
+
+        // Output buffer should match expected state from duplexing
+        assert_eq!(chal.output_buffer, expected_output);
+    }
+
+    #[test]
+    fn test_observe_base_as_algebra_element_consistency_with_direct_observe() {
+        // Create two identical challengers to verify behavior equivalence
+        let mut chal1 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        let mut chal2 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        let base_val = G::from_u8(99);
+
+        // Method 1: Use the convenience method for base-to-extension observation
+        chal1.observe_base_as_algebra_element::<EF2G>(base_val);
+
+        // Method 2: Manually convert to extension field then observe
+        let ext_val = EF2G::from(base_val);
+        chal2.observe_algebra_element(ext_val);
+
+        // Both methods must produce identical internal state
+        assert_eq!(chal1.input_buffer, chal2.input_buffer);
+        assert_eq!(chal1.output_buffer, chal2.output_buffer);
+        assert_eq!(chal1.sponge_state, chal2.sponge_state);
+    }
+
+    #[test]
+    fn test_observe_base_as_algebra_element_stream_consistency() {
+        // Create two identical challengers for stream observation test
+        let mut chal1 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        let mut chal2 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // Define a base value vector
+        let base_values: Vec<_> = (0u8..25).map(G::from_u8).collect();
+
+        // Method 1: Observe stream using convenience method
+        for &val in &base_values {
+            chal1.observe_base_as_algebra_element::<EF2G>(val);
+        }
+
+        // Method 2: Manually convert each element before observing
+        for &val in &base_values {
+            let ext_val = EF2G::from(val);
+            chal2.observe_algebra_element(ext_val);
+        }
+
+        // Verify identical state through sequential observations and duplexing.
+        assert_eq!(chal1.input_buffer, chal2.input_buffer);
+        assert_eq!(chal1.output_buffer, chal2.output_buffer);
+        assert_eq!(chal1.sponge_state, chal2.sponge_state);
+
+        // Verify sampling produces identical challenges
+        let sample1: EF2G = chal1.sample_algebra_element();
+        let sample2: EF2G = chal2.sample_algebra_element();
+        assert_eq!(sample1, sample2);
+
+        // Verify state consistency is maintained after sampling
+        assert_eq!(chal1.input_buffer, chal2.input_buffer);
+        assert_eq!(chal1.output_buffer, chal2.output_buffer);
+        assert_eq!(chal1.sponge_state, chal2.sponge_state);
+    }
+
+    #[test]
+    fn test_observe_algebra_elements_equivalence() {
+        // Test that the two following paths give the same results:
+        // - `observe_algebra_slice`
+        // - `observe_algebra_element` in a loop
+        let mut chal1 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        let mut chal2 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // Create a slice of extension field elements
+        let ext_values: Vec<EF2G> = (0u8..10).map(|i| EF2G::from(G::from_u8(i))).collect();
+
+        // Method 1: Use observe_algebra_slice with slice
+        chal1.observe_algebra_slice(&ext_values);
+
+        // Method 2: Call observe_algebra_element individually
+        for ext_val in &ext_values {
+            chal2.observe_algebra_element(*ext_val);
+        }
+
+        // Verify identical internal state
+        assert_eq!(chal1.input_buffer, chal2.input_buffer);
+        assert_eq!(chal1.output_buffer, chal2.output_buffer);
+        assert_eq!(chal1.sponge_state, chal2.sponge_state);
+
+        // Verify sampling produces identical challenges
+        let sample1: EF2G = chal1.sample_algebra_element();
+        let sample2: EF2G = chal2.sample_algebra_element();
+        assert_eq!(sample1, sample2);
+    }
+
+    #[test]
+    fn test_observe_algebra_elements_empty_slice() {
+        // Test that observing an empty slice does not change state
+        let mut chal1 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+        let mut chal2 =
+            DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // Observe some values first to have non-trivial state
+        chal1.observe(G::from_u8(42));
+        chal2.observe(G::from_u8(42));
+
+        // Observe empty slice
+        let empty: Vec<EF2G> = vec![];
+        chal1.observe_algebra_slice(&empty);
+
+        // Verify state unchanged
+        assert_eq!(chal1.input_buffer, chal2.input_buffer);
+        assert_eq!(chal1.output_buffer, chal2.output_buffer);
+        assert_eq!(chal1.sponge_state, chal2.sponge_state);
+    }
+
+    #[test]
+    fn test_observe_algebra_elements_triggers_duplexing() {
+        // Test that observing enough elements triggers duplexing
+        let mut chal = DuplexChallenger::<G, TestPermutation, WIDTH, RATE>::new(TestPermutation {});
+
+        // EF2G has dimension 2, so we need RATE/2 elements to fill the buffer
+        //
+        // With RATE=16, we need 8 EF2G elements to trigger duplexing
+        let ext_values: Vec<EF2G> = (0u8..8).map(|i| EF2G::from(G::from_u8(i))).collect();
+
+        assert!(chal.input_buffer.is_empty());
+        assert!(chal.output_buffer.is_empty());
+
+        chal.observe_algebra_slice(&ext_values);
+
+        // After observing 8 EF2G elements (16 base field elements), duplexing should occur
+        assert!(chal.input_buffer.is_empty());
+        assert!(!chal.output_buffer.is_empty());
+    }
+}

@@ -26,3 +26,4 @@ scripts/aby_tests/tests
 /example_cert/*
 *backup
 Cargo.lock
+/feargus

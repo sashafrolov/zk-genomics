@@ -12,3 +12,4 @@ The subdirectories contain the code for different experiments run in the paper, 
 - We used Varun Thakore's merkle tree implementation as a basis for `merkle-trees`.
 - We used [Plonky3](https://github.com/Plonky3/Plonky3) as the base for our final implementation of Merkle tree related experiments.
 - We used some of the example circuits in `Spartan2` as the basis for our alignment circuits.
+- We used the dataset from the [QTL-MAS workshop](https://jay.up.poznan.pl/qtlmas2010/dataset.html) for our GWAS experiments.

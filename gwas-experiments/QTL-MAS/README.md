@@ -1,0 +1,2 @@
+#  QTL-MAS workshop Dataset Instructions
+We used the dataset from the [QTL-MAS workshop](https://jay.up.poznan.pl/qtlmas2010/dataset.html) to benchmark our experiments. Download the Phenotypes file (phenotypes.txt) and the Marker data file (genotypes.txt). Then run "python3 process_qtlmas.py" (requires scikit-learn and tomli-w) to preform linear regression and to create the Prover.toml file for the Noir circuit.

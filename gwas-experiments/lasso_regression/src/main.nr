@@ -1,17 +1,20 @@
-global EVAL_SET_SIZE: u32 = 867;
-global NUM_FEATURES: u32 = 1000; // This is not sparse, may change later.
+//global EVAL_SET_SIZE: u32 = 2326;
+global EVAL_SET_SIZE: u32 = 37;
+global NUM_FEATURES: u32 = 10031; // This is not sparse, may change later.
 global NUM_COEFFS: u32 = NUM_FEATURES + 1; // There is an additional bias term.
-global FIXED_POINT_PRECISION_BYTES: u32 = 4; 
-global FIXED_POINT_MAX_MAGNITUDE_BYTES: u32 = 4; // Implicit precision assumption that these two precisions add to less than 15, since u128's are used in here.
-global RIGHT_SHIFT_FACTOR : Field = 2.pow_32((FIXED_POINT_PRECISION_BYTES * 8) as Field);
-global FIXED_POINT_ZERO : Field = 2.pow_32((FIXED_POINT_PRECISION_BYTES * 8 + FIXED_POINT_MAX_MAGNITUDE_BYTES * 8) as Field);
+global FIXED_POINT_PRECISION_BYTES: u32 = 8;
+global FIXED_POINT_MAX_MAGNITUDE_BYTES: u32 = 8; // Implicit precision assumption that these two precisions add to less than 15, since u128's are used in here.
+
+// Hardcode 2^64 and 2^128 directly to bypass Noir compiler pow_32 limitations
+global RIGHT_SHIFT_FACTOR : Field = 18446744073709551616; // 2^64
+global FIXED_POINT_ZERO : Field = 340282366920938463463374607431768211456; // 2^128
 
 // X is the set of data points in the evaluation set.
 // y is the set of expected outputs for the evaluation set.
 // beta is the set of claimed coefficients, which is public. (note that the bias term is the last rather than the first.)
 // regularization_constraint is the value that the L1 norm of beta must be less than.
 // All of these values must be in fixed point form of sufficient precision.
-fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: [Field; EVAL_SET_SIZE], beta: pub [Field; NUM_COEFFS], regularization_constraint: pub Field, challenge: pub Field) -> pub (Field, Field, Field) {    
+fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: [Field; EVAL_SET_SIZE], beta: pub [Field; NUM_COEFFS], regularization_constraint: pub Field, challenge: pub Field) -> pub (Field, Field, Field) {
     let mut predictions = [0; EVAL_SET_SIZE];
     // Populate predictions
     for i in 0..EVAL_SET_SIZE {
@@ -32,7 +35,7 @@ fn main(X: [[Field; NUM_FEATURES]; EVAL_SET_SIZE], y: [Field; EVAL_SET_SIZE], be
         let squared_error = fixed_point_multiply(diff, diff);
         l2_loss = fixed_point_add(l2_loss, squared_error);
     }
-    
+
     // Enforce the L1 regularization constraint.
     // Need to build a fixed point zero here.
     let mut l1_norm = FIXED_POINT_ZERO;
@@ -86,7 +89,7 @@ unconstrained fn right_shift(val: Field, shift_amount: u32) -> (Field, Field) {
     }
 
     for i in 0..shift_amount {
-        remainder_bytes[i] = bytes[i];   
+        remainder_bytes[i] = bytes[i];
     }
 
     let shifted = Field::from_le_bytes::<32>(shifted_bytes);
@@ -111,7 +114,7 @@ fn fixed_point_multiply(x: Field, y: Field) -> Field {
 
     assert(shifted * RIGHT_SHIFT_FACTOR + remainder == prod); // range check
     remainder.assert_max_bit_size::<FIXED_POINT_PRECISION_BYTES * 8>();
-    
+
     let result_is_neg = x_is_neg != y_is_neg;
     if result_is_neg {
         FIXED_POINT_ZERO - shifted
@@ -131,7 +134,7 @@ fn fixed_point_subtract(x: Field, y: Field) -> Field {
 unconstrained fn is_negative_hint(x: Field) -> bool {
     let x_bytes = x.to_le_bytes::<32>();
     let z_bytes = FIXED_POINT_ZERO.to_le_bytes::<32>();
-    
+
     // Implement Field comparison on bytes, which we do have access to.
     let mut result = false;
     for i in 0..32 {
@@ -147,17 +150,17 @@ unconstrained fn is_negative_hint(x: Field) -> bool {
 fn fixed_point_abs(x: Field) -> (Field, bool) {
     // Safety: we do range checks to verify this is correct.
     let is_negative: bool = unsafe { is_negative_hint(x) };
-    
+
     let abs_value = if is_negative {
         fixed_point_subtract(FIXED_POINT_ZERO, x)
     } else {
         x
     };
-    
+
     // Check bitlength of absolute value is correct.
     let abs_unbiased = abs_value - FIXED_POINT_ZERO;
     abs_unbiased.assert_max_bit_size::<(FIXED_POINT_PRECISION_BYTES + FIXED_POINT_MAX_MAGNITUDE_BYTES) * 8>();
-    
+
     (abs_value, is_negative)
 }
 
